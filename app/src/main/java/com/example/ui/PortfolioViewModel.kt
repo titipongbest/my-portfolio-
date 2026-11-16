@@ -81,6 +81,7 @@ class PortfolioViewModel(
     private var refreshJob: Job? = null
     private var autoBackupJob: Job? = null
     private var dividendJob: Job? = null
+    private var pendingExportJson: String? = null
 
     private val holdingsState: StateFlow<HoldingsLoadState> = repository.observeHoldings()
         .map<List<Holding>, HoldingsLoadState> { HoldingsLoadState.Success(it) }
@@ -230,14 +231,18 @@ class PortfolioViewModel(
         autoBackupJob?.cancel()
         autoBackupJob = viewModelScope.launch {
             delay(250L)
-            val json = PortfolioJsonCodec.encode(holdings, sectors)
-            val res = writer.writeJsonToUri(uri, json)
+            val res = runCatching {
+                val json = PortfolioJsonCodec.encode(holdings, sectors)
+                writer.writeJsonToUri(uri, json).getOrThrow()
+            }
             if (res.isSuccess) {
                 settingsStore.recordAutoBackupResult(success = true)
             } else {
+                val err = res.exceptionOrNull()
+                if (err is CancellationException) throw err
                 settingsStore.recordAutoBackupResult(
                     success = false,
-                    errorMessage = res.exceptionOrNull()?.localizedMessage ?: "ไม่สามารถเขียนทับไฟล์สำรองอัตโนมัติได้"
+                    errorMessage = err?.localizedMessage ?: "ไม่สามารถเขียนทับไฟล์สำรองอัตโนมัติได้"
                 )
             }
         }
@@ -407,19 +412,33 @@ class PortfolioViewModel(
         _actionMessage.value = "คืนค่ากลุ่มอุตสาหกรรมเริ่มต้นแล้ว"
     }
 
+    fun setPendingExportJson(json: String?) {
+        pendingExportJson = json
+    }
+
+    fun consumePendingExportJson(): String? {
+        val current = pendingExportJson
+        pendingExportJson = null
+        return current
+    }
+
     fun configureAutoBackupDestination(uriString: String, fileName: String) {
         settingsStore.setAutoBackupDestination(uriString, fileName, enabled = true)
         viewModelScope.launch {
             val writer = autoBackupWriter ?: return@launch
-            val items = repository.getHoldingsOnce()
-            val sectors = settingsStore.managedSectors.value
-            val json = PortfolioJsonCodec.encode(items, sectors)
-            val res = writer.writeJsonToUri(uriString, json)
+            val res = runCatching {
+                val items = repository.getHoldingsOnce()
+                val sectors = settingsStore.managedSectors.value
+                val json = PortfolioJsonCodec.encode(items, sectors)
+                writer.writeJsonToUri(uriString, json).getOrThrow()
+            }
             if (res.isSuccess) {
                 settingsStore.recordAutoBackupResult(success = true)
                 _actionMessage.value = "ตั้งค่าและสำรองข้อมูลลง \"$fileName\" แล้ว"
             } else {
-                val err = res.exceptionOrNull()?.localizedMessage ?: "ไม่สามารถเขียนไฟล์ได้"
+                val errObj = res.exceptionOrNull()
+                if (errObj is CancellationException) throw errObj
+                val err = errObj?.localizedMessage ?: "ไม่สามารถเขียนไฟล์ได้"
                 settingsStore.recordAutoBackupResult(success = false, errorMessage = err)
                 _actionMessage.value = "ตั้งค่าตำแหน่งแล้ว แต่เขียนไฟล์ไม่สำเร็จ: $err"
             }
@@ -446,17 +465,21 @@ class PortfolioViewModel(
             return
         }
         viewModelScope.launch {
-            val items = repository.getHoldingsOnce()
-            val sectors = settingsStore.managedSectors.value
-            val json = PortfolioJsonCodec.encode(items, sectors)
-            val res = writer.writeJsonToUri(uri, json)
+            val res = runCatching {
+                val items = repository.getHoldingsOnce()
+                val sectors = settingsStore.managedSectors.value
+                val json = PortfolioJsonCodec.encode(items, sectors)
+                writer.writeJsonToUri(uri, json).getOrThrow()
+            }
             if (res.isSuccess) {
                 settingsStore.recordAutoBackupResult(success = true)
                 if (showToast) {
                     _actionMessage.value = "บันทึกข้อมูลทับไฟล์ \"${config.fileName ?: "สำรอง"}\" เรียบร้อย"
                 }
             } else {
-                val err = res.exceptionOrNull()?.localizedMessage ?: "เขียนไฟล์ไม่สำเร็จ"
+                val errObj = res.exceptionOrNull()
+                if (errObj is CancellationException) throw errObj
+                val err = errObj?.localizedMessage ?: "เขียนไฟล์ไม่สำเร็จ"
                 settingsStore.recordAutoBackupResult(success = false, errorMessage = err)
                 if (showToast) {
                     _actionMessage.value = "สำรองข้อมูลไม่สำเร็จ: $err"

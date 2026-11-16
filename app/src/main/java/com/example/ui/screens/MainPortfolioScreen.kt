@@ -1,5 +1,14 @@
 package com.example.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.ContentValues
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,11 +26,14 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.automirrored.filled.ShowChart
@@ -55,6 +67,7 @@ import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -106,9 +119,11 @@ import com.example.ui.PortfolioViewModel
 import com.example.ui.theme.LocalPortfolioColors
 import com.example.ui.theme.categoryAccentColor
 import com.example.ui.theme.categoryContainerColor
+import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -158,8 +173,12 @@ fun MainPortfolioScreen(
     var showSecurityDialog by remember { mutableStateOf(false) }
     var showManageSectorsDialog by remember { mutableStateOf(false) }
     var newlyCreatedSectorId by remember { mutableStateOf<String?>(null) }
-    var pendingExportJson by remember { mutableStateOf<String?>(null) }
     var pendingImportPayload by remember { mutableStateOf<PortfolioBackupPayload?>(null) }
+    var fallbackExportJson by remember { mutableStateOf<String?>(null) }
+    var showPasteImportDialog by remember { mutableStateOf(false) }
+    var pasteImportText by remember { mutableStateOf("") }
+    var pasteImportError by remember { mutableStateOf<String?>(null) }
+    var pasteImportHint by remember { mutableStateOf<String?>(null) }
     var suppressNextAutoLock by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -187,35 +206,24 @@ fun MainPortfolioScreen(
         onCategoryChanged(uiState.selectedCategory)
     }
 
-    val exportDocumentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json")
-    ) { uri ->
-        val jsonPayload = pendingExportJson
-        pendingExportJson = null
+    fun handleExportUriSelected(uri: Uri?) {
+        val jsonPayload = viewModel.consumePendingExportJson()
         if (uri != null && jsonPayload != null) {
             scope.launch {
-                val writeResult = withContext(Dispatchers.IO) {
-                    runCatching {
-                        context.contentResolver.openOutputStream(uri)?.use { stream ->
-                            stream.write(jsonPayload.toByteArray(Charsets.UTF_8))
-                            stream.flush()
-                        } ?: error("ไม่สามารถเปิดไฟล์เพื่อบันทึกได้")
-                    }
-                }
+                val writeResult = writeJsonToUriSafely(context, uri, jsonPayload)
                 if (writeResult.isSuccess) {
                     viewModel.notifyMessage("ส่งออกข้อมูลพอร์ตเป็นไฟล์ JSON เรียบร้อย")
                 } else {
                     viewModel.notifyMessage(
                         "ส่งออกไฟล์ไม่สำเร็จ: ${writeResult.exceptionOrNull()?.localizedMessage ?: "เกิดข้อผิดพลาด"}"
                     )
+                    fallbackExportJson = jsonPayload
                 }
             }
         }
     }
 
-    val autoBackupFileLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json")
-    ) { uri ->
+    fun handleAutoBackupUriSelected(uri: Uri?) {
         if (uri != null) {
             AndroidAutoBackupWriter.persistWritePermission(context, uri)
             val fileName = AndroidAutoBackupWriter.resolveDisplayName(context, uri)
@@ -223,43 +231,74 @@ fun MainPortfolioScreen(
         }
     }
 
-    val importDocumentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
+    fun handleImportUriSelected(uri: Uri?) {
         if (uri != null) {
             scope.launch {
-                val readResult = withContext(Dispatchers.IO) {
-                    runCatching {
-                        context.contentResolver.openInputStream(uri)?.use { stream ->
-                            stream.bufferedReader(Charsets.UTF_8).readText()
-                        } ?: error("ไม่สามารถอ่านไฟล์ที่เลือกได้")
-                    }
-                }
-                readResult.onSuccess { rawJson ->
-                    val decoded = PortfolioJsonCodec.decodeWithSectors(rawJson)
-                    decoded.onSuccess { payload ->
-                        pendingImportPayload = payload
-                    }.onFailure { err ->
-                        viewModel.notifyMessage(err.message ?: "รูปแบบไฟล์ JSON ไม่ถูกต้อง")
-                    }
+                val decodedResult = readAndDecodeBackupUri(context, uri)
+                decodedResult.onSuccess { payload ->
+                    pendingImportPayload = payload
                 }.onFailure { err ->
-                    viewModel.notifyMessage("อ่านไฟล์ไม่สำเร็จ: ${err.localizedMessage ?: "เกิดข้อผิดพลาด"}")
+                    viewModel.notifyMessage(err.message ?: "ไม่สามารถอ่านไฟล์ JSON ได้")
                 }
             }
         }
     }
 
+    val exportDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> handleExportUriSelected(uri) }
+
+    val exportAnyDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("*/*")
+    ) { uri -> handleExportUriSelected(uri) }
+
+    val autoBackupFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> handleAutoBackupUriSelected(uri) }
+
+    val autoBackupAnyFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("*/*")
+    ) { uri -> handleAutoBackupUriSelected(uri) }
+
+    val importDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri -> handleImportUriSelected(uri) }
+
+    val importGetContentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri -> handleImportUriSelected(uri) }
+
     fun triggerExportJson() {
         scope.launch {
+            if (uiState.allHoldings.isEmpty()) {
+                viewModel.notifyMessage("ยังไม่มีข้อมูลสินทรัพย์ในพอร์ตสำหรับส่งออก")
+                return@launch
+            }
             val res = viewModel.exportPortfolioJson()
             res.onSuccess { json ->
-                if (uiState.allHoldings.isEmpty()) {
-                    viewModel.notifyMessage("ยังไม่มีข้อมูลสินทรัพย์ในพอร์ตสำหรับส่งออก")
-                } else {
-                    pendingExportJson = json
-                    val dateStamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
-                    suppressNextAutoLock = true
-                    exportDocumentLauncher.launch("portpulse_backup_$dateStamp.json")
+                viewModel.setPendingExportJson(json)
+                val dateStamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
+                val suggestedName = "portpulse_backup_$dateStamp.json"
+                suppressNextAutoLock = true
+                val launchedPrimary = try {
+                    exportDocumentLauncher.launch(suggestedName)
+                    true
+                } catch (_: Exception) {
+                    false
+                }
+                if (!launchedPrimary) {
+                    val launchedFallback = try {
+                        exportAnyDocumentLauncher.launch(suggestedName)
+                        true
+                    } catch (_: Exception) {
+                        false
+                    }
+                    if (!launchedFallback) {
+                        suppressNextAutoLock = false
+                        viewModel.consumePendingExportJson()
+                        fallbackExportJson = json
+                        viewModel.notifyMessage("อุปกรณ์นี้ไม่มีตัวเลือกสร้างไฟล์ กรุณาคัดลอก แชร์ หรือบันทึกลง Downloads แทน")
+                    }
                 }
             }.onFailure { err ->
                 viewModel.notifyMessage("เตรียมไฟล์ส่งออกไม่สำเร็จ: ${err.localizedMessage ?: "เกิดข้อผิดพลาด"}")
@@ -267,19 +306,79 @@ fun MainPortfolioScreen(
         }
     }
 
+    fun triggerExportCopyShare() {
+        scope.launch {
+            if (uiState.allHoldings.isEmpty()) {
+                viewModel.notifyMessage("ยังไม่มีข้อมูลสินทรัพย์ในพอร์ตสำหรับส่งออก")
+                return@launch
+            }
+            val res = viewModel.exportPortfolioJson()
+            res.onSuccess { json ->
+                fallbackExportJson = json
+            }.onFailure { err ->
+                viewModel.notifyMessage("เตรียมข้อมูลส่งออกไม่สำเร็จ: ${err.localizedMessage ?: "เกิดข้อผิดพลาด"}")
+            }
+        }
+    }
+
+    fun triggerOpenPasteImport(hint: String? = null) {
+        pasteImportHint = hint
+        pasteImportError = null
+        showPasteImportDialog = true
+    }
+
     fun triggerImportJson() {
         suppressNextAutoLock = true
-        importDocumentLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+        val launchedPrimary = try {
+            importDocumentLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+            true
+        } catch (_: Exception) {
+            false
+        }
+        if (!launchedPrimary) {
+            val launchedFallback = try {
+                importGetContentLauncher.launch("*/*")
+                true
+            } catch (_: Exception) {
+                false
+            }
+            if (!launchedFallback) {
+                suppressNextAutoLock = false
+                triggerOpenPasteImport(
+                    hint = "อุปกรณ์นี้ไม่มีตัวเลือกไฟล์ระบบ (DocumentsUI) กรุณาวางข้อความ JSON เพื่อนำเข้าแทน"
+                )
+            }
+        }
     }
 
     fun triggerSelectAutoBackupLocation() {
         suppressNextAutoLock = true
-        autoBackupFileLauncher.launch("portpulse_auto_backup.json")
+        val fileName = "portpulse_auto_backup.json"
+        val launchedPrimary = try {
+            autoBackupFileLauncher.launch(fileName)
+            true
+        } catch (_: Exception) {
+            false
+        }
+        if (!launchedPrimary) {
+            val launchedFallback = try {
+                autoBackupAnyFileLauncher.launch(fileName)
+                true
+            } catch (_: Exception) {
+                false
+            }
+            if (!launchedFallback) {
+                suppressNextAutoLock = false
+                viewModel.notifyMessage(
+                    "อุปกรณ์นี้ไม่มีตัวเลือกไฟล์ระบบ (DocumentsUI) กรุณาใช้คัดลอกหรือส่งออก JSON แทน"
+                )
+            }
+        }
     }
 
-    LaunchedEffect(uiState.actionMessage) {
+    LaunchedEffect(uiState.actionMessage, showBackupScreen) {
         val msg = uiState.actionMessage
-        if (!msg.isNullOrBlank()) {
+        if (!showBackupScreen && !msg.isNullOrBlank()) {
             snackbarHostState.showSnackbar(msg)
             viewModel.clearActionMessage()
         }
@@ -295,70 +394,6 @@ fun MainPortfolioScreen(
 
     BackHandler(enabled = selectedTab != MainTab.DASHBOARD) {
         selectedTab = MainTab.DASHBOARD
-    }
-
-    if (pendingImportPayload != null) {
-        val payload = pendingImportPayload!!
-        val parsed = payload.holdings
-        val categoryBreakdown = AssetCategory.entries.mapNotNull { cat ->
-            val count = parsed.count { it.assetCategory == cat }
-            if (count > 0) "${cat.shortLabelTh} $count" else null
-        }.joinToString(" • ")
-        val previewSymbols = parsed.take(5).joinToString(", ") { it.symbol } +
-            if (parsed.size > 5) " และอีก ${parsed.size - 5} รายการ" else ""
-        AlertDialog(
-            onDismissRequest = { pendingImportPayload = null },
-            title = { Text("นำเข้าข้อมูลพอร์ต (JSON)") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "พบสินทรัพย์ทั้งหมด ${parsed.size} รายการ ($previewSymbols)",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    if (categoryBreakdown.isNotBlank()) {
-                        Text(
-                            text = "หมวดหมู่ในไฟล์: $categoryBreakdown",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Text(
-                        text = "เลือกรูปแบบการนำเข้าข้อมูล:",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Button(
-                        onClick = {
-                            pendingImportPayload = null
-                            viewModel.importHoldings(parsed, payload.sectors, ImportMode.MERGE)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("import_merge_button")
-                    ) {
-                        Text("เพิ่มต่อจากพอร์ตเดิม")
-                    }
-                    OutlinedButton(
-                        onClick = {
-                            pendingImportPayload = null
-                            viewModel.importHoldings(parsed, payload.sectors, ImportMode.REPLACE)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("import_replace_button")
-                    ) {
-                        Text("แทนที่ข้อมูลพอร์ตทั้งหมด")
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { pendingImportPayload = null }) {
-                    Text("ยกเลิก")
-                }
-            }
-        )
     }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -645,12 +680,260 @@ fun MainPortfolioScreen(
         BackupScreenDialog(
             allHoldings = uiState.allHoldings,
             autoBackupConfig = uiState.autoBackupConfig,
+            actionMessage = uiState.actionMessage,
+            onConsumeActionMessage = viewModel::clearActionMessage,
             onToggleAutoBackup = viewModel::toggleAutoBackup,
             onSelectAutoBackupLocation = { triggerSelectAutoBackupLocation() },
             onRunAutoBackupNow = { viewModel.runAutoBackupNow(showToast = true) },
             onExportJsonClick = { triggerExportJson() },
+            onExportCopyShareClick = { triggerExportCopyShare() },
             onImportJsonClick = { triggerImportJson() },
+            onImportPasteJsonClick = { triggerOpenPasteImport() },
             onDismiss = { showBackupScreen = false }
+        )
+    }
+
+    if (fallbackExportJson != null) {
+        val exportJsonText = fallbackExportJson!!
+        val dateStamp = remember(exportJsonText) {
+            SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
+        }
+        val previewSnippet = remember(exportJsonText) {
+            if (exportJsonText.length <= 1200) exportJsonText else exportJsonText.take(1200) + "\n..."
+        }
+        AlertDialog(
+            onDismissRequest = { fallbackExportJson = null },
+            title = { Text("ส่งออกข้อมูลพอร์ต (JSON)") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "สามารถคัดลอกข้อความ JSON ด้านล่าง แชร์ไปยังแอปอื่น หรือบันทึกไปยังโฟลเดอร์ Downloads ได้ทันที",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 180.dp)
+                    ) {
+                        Text(
+                            text = previewSnippet,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier
+                                .verticalScroll(rememberScrollState())
+                                .padding(10.dp)
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            if (copyTextToClipboard(context, "PortPulse Backup JSON", exportJsonText)) {
+                                viewModel.notifyMessage("คัดลอกข้อมูล JSON ไปยังคลิปบอร์ดแล้ว")
+                            } else {
+                                viewModel.notifyMessage("ไม่สามารถคัดลอกไปยังคลิปบอร์ดได้")
+                            }
+                            fallbackExportJson = null
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("export_copy_clipboard_button")
+                    ) {
+                        Text("คัดลอก JSON ทั้งหมด")
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    val fileName = "portpulse_backup_$dateStamp.json"
+                                    val saveRes = saveJsonToMediaStoreDownloads(context, exportJsonText, fileName)
+                                    if (saveRes.isSuccess) {
+                                        viewModel.notifyMessage("บันทึกไฟล์ $fileName ลงโฟลเดอร์ Downloads แล้ว")
+                                    } else {
+                                        viewModel.notifyMessage(
+                                            "บันทึกลง Downloads ไม่สำเร็จ: ${saveRes.exceptionOrNull()?.localizedMessage ?: "เกิดข้อผิดพลาด"}"
+                                        )
+                                    }
+                                    fallbackExportJson = null
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("export_save_downloads_button")
+                        ) {
+                            Text("บันทึกลงโฟลเดอร์ Downloads")
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            suppressNextAutoLock = true
+                            val shared = shareJsonText(context, exportJsonText)
+                            if (!shared) {
+                                suppressNextAutoLock = false
+                                viewModel.notifyMessage("ไม่พบแอปสำหรับแชร์ข้อความในอุปกรณ์นี้")
+                            }
+                            fallbackExportJson = null
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("export_share_button")
+                    ) {
+                        Text("แชร์ข้อความ JSON")
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { fallbackExportJson = null }) {
+                    Text("ปิด")
+                }
+            }
+        )
+    }
+
+    if (showPasteImportDialog) {
+        AlertDialog(
+            onDismissRequest = { showPasteImportDialog = false },
+            title = { Text("วางข้อความ JSON เพื่อนำเข้า") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!pasteImportHint.isNullOrBlank()) {
+                        Text(
+                            text = pasteImportHint!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    OutlinedTextField(
+                        value = pasteImportText,
+                        onValueChange = {
+                            pasteImportText = it
+                            pasteImportError = null
+                        },
+                        label = { Text("ข้อมูล JSON สำรองพอร์ต") },
+                        placeholder = { Text("วางเนื้อหา JSON ที่ขึ้นต้นด้วย { ... } หรือ [ ... ]") },
+                        minLines = 5,
+                        maxLines = 8,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("paste_import_json_field")
+                    )
+                    if (!pasteImportError.isNullOrBlank()) {
+                        Text(
+                            text = pasteImportError!!,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            val clipText = readTextFromClipboard(context)
+                            if (!clipText.isNullOrBlank()) {
+                                pasteImportText = clipText
+                                pasteImportError = null
+                            } else {
+                                pasteImportError = "ไม่พบข้อความในคลิปบอร์ด"
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("วางจากคลิปบอร์ด")
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val decoded = PortfolioJsonCodec.decodeWithSectors(pasteImportText)
+                        decoded.onSuccess { payload ->
+                            showPasteImportDialog = false
+                            pasteImportText = ""
+                            pasteImportError = null
+                            pendingImportPayload = payload
+                        }.onFailure { err ->
+                            pasteImportError = err.message ?: "รูปแบบ JSON ไม่ถูกต้อง"
+                        }
+                    },
+                    modifier = Modifier.testTag("paste_import_confirm_button")
+                ) {
+                    Text("ตรวจสอบและนำเข้า")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showPasteImportDialog = false
+                        pasteImportError = null
+                    }
+                ) {
+                    Text("ยกเลิก")
+                }
+            }
+        )
+    }
+
+    if (pendingImportPayload != null) {
+        val payload = pendingImportPayload!!
+        val parsed = payload.holdings
+        val categoryBreakdown = AssetCategory.entries.mapNotNull { cat ->
+            val count = parsed.count { it.assetCategory == cat }
+            if (count > 0) "${cat.shortLabelTh} $count" else null
+        }.joinToString(" • ")
+        val previewSymbols = parsed.take(5).joinToString(", ") { it.symbol } +
+            if (parsed.size > 5) " และอีก ${parsed.size - 5} รายการ" else ""
+        AlertDialog(
+            onDismissRequest = { pendingImportPayload = null },
+            title = { Text("นำเข้าข้อมูลพอร์ต (JSON)") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "พบสินทรัพย์ทั้งหมด ${parsed.size} รายการ ($previewSymbols)",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    if (categoryBreakdown.isNotBlank()) {
+                        Text(
+                            text = "หมวดหมู่ในไฟล์: $categoryBreakdown",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Text(
+                        text = "เลือกรูปแบบการนำเข้าข้อมูล:",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Button(
+                        onClick = {
+                            pendingImportPayload = null
+                            viewModel.importHoldings(parsed, payload.sectors, ImportMode.MERGE)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("import_merge_button")
+                    ) {
+                        Text("เพิ่มต่อจากพอร์ตเดิม")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            pendingImportPayload = null
+                            viewModel.importHoldings(parsed, payload.sectors, ImportMode.REPLACE)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("import_replace_button")
+                    ) {
+                        Text("แทนที่ข้อมูลพอร์ตทั้งหมด")
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { pendingImportPayload = null }) {
+                    Text("ยกเลิก")
+                }
+            }
         )
     }
 
@@ -881,4 +1164,154 @@ private fun categoryMenuIcon(category: AssetCategory): ImageVector = when (categ
     AssetCategory.MUTUAL_FUND -> Icons.Default.AccountBalance
     AssetCategory.GOLD -> Icons.Default.Diamond
     AssetCategory.CRYPTO -> Icons.Default.CurrencyBitcoin
+}
+
+private suspend fun writeJsonToUriSafely(
+    context: Context,
+    uri: Uri,
+    jsonPayload: String
+): Result<Unit> = withContext(Dispatchers.IO) {
+    try {
+        val resolver = context.contentResolver
+        val bytes = jsonPayload.toByteArray(Charsets.UTF_8)
+        val wroteTruncated = try {
+            resolver.openOutputStream(uri, "wt")?.use { stream ->
+                stream.write(bytes)
+                stream.flush()
+            } != null
+        } catch (_: UnsupportedOperationException) {
+            false
+        } catch (_: IllegalArgumentException) {
+            false
+        }
+        if (!wroteTruncated) {
+            resolver.openOutputStream(uri)?.use { stream ->
+                stream.write(bytes)
+                stream.flush()
+            } ?: error("ไม่สามารถเปิดไฟล์เพื่อบันทึกได้")
+        }
+        Result.success(Unit)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+}
+
+private suspend fun readAndDecodeBackupUri(
+    context: Context,
+    uri: Uri
+): Result<PortfolioBackupPayload> {
+    val readResult = withContext(Dispatchers.IO) {
+        try {
+            val stream = context.contentResolver.openInputStream(uri)
+                ?: error("ไม่สามารถอ่านไฟล์ที่เลือกได้")
+            val rawText = stream.use { input ->
+                val buffer = ByteArray(8192)
+                val out = ByteArrayOutputStream()
+                var total = 0
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read == -1) break
+                    total += read
+                    if (total > PortfolioJsonCodec.MAX_IMPORT_JSON_BYTES) {
+                        error("ไฟล์มีขนาดใหญ่เกิน 5 MB กรุณาเลือกไฟล์สำรอง JSON ที่ถูกต้อง")
+                    }
+                    out.write(buffer, 0, read)
+                }
+                out.toString(Charsets.UTF_8.name())
+            }
+            Result.success(rawText)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(
+                IllegalArgumentException("อ่านไฟล์ไม่สำเร็จ: ${e.localizedMessage ?: "เกิดข้อผิดพลาด"}")
+            )
+        } catch (_: OutOfMemoryError) {
+            Result.failure(
+                IllegalArgumentException("ไฟล์มีขนาดใหญ่เกินไป ไม่สามารถอ่านได้")
+            )
+        }
+    }
+
+    val rawJson = readResult.getOrElse { return Result.failure(it) }
+    return withContext(Dispatchers.Default) {
+        PortfolioJsonCodec.decodeWithSectors(rawJson)
+    }
+}
+
+private suspend fun saveJsonToMediaStoreDownloads(
+    context: Context,
+    jsonPayload: String,
+    fileName: String
+): Result<String> = withContext(Dispatchers.IO) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+        return@withContext Result.failure(UnsupportedOperationException("ไม่รองรับการบันทึกลง Downloads โดยตรงใน Android เวอร์ชันนี้"))
+    }
+    val resolver = context.contentResolver
+    var insertedUri: Uri? = null
+    try {
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+            put(MediaStore.Downloads.MIME_TYPE, "application/json")
+            put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: error("ไม่สามารถสร้างไฟล์ในโฟลเดอร์ Downloads ได้")
+        insertedUri = uri
+
+        resolver.openOutputStream(uri)?.use { stream ->
+            stream.write(jsonPayload.toByteArray(Charsets.UTF_8))
+            stream.flush()
+        } ?: error("ไม่สามารถเขียนข้อมูลลงไฟล์ Downloads ได้")
+
+        val publishValues = ContentValues().apply {
+            put(MediaStore.Downloads.IS_PENDING, 0)
+        }
+        resolver.update(uri, publishValues, null, null)
+        Result.success(fileName)
+    } catch (e: CancellationException) {
+        insertedUri?.let { runCatching { resolver.delete(it, null, null) } }
+        throw e
+    } catch (e: Exception) {
+        insertedUri?.let { runCatching { resolver.delete(it, null, null) } }
+        Result.failure(e)
+    }
+}
+
+private fun copyTextToClipboard(context: Context, label: String, text: String): Boolean {
+    return runCatching {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            ?: return false
+        clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
+        true
+    }.getOrDefault(false)
+}
+
+private fun readTextFromClipboard(context: Context): String? {
+    return runCatching {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            ?: return null
+        val clip = clipboard.primaryClip ?: return null
+        if (clip.itemCount <= 0) return null
+        clip.getItemAt(0).coerceToText(context)?.toString()
+    }.getOrNull()
+}
+
+private fun shareJsonText(context: Context, json: String): Boolean {
+    return runCatching {
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "PortPulse Backup JSON")
+            putExtra(Intent.EXTRA_TEXT, json)
+        }
+        val chooser = Intent.createChooser(sendIntent, "แชร์ข้อมูลสำรองพอร์ต (JSON)")
+        if (context !is android.app.Activity) {
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(chooser)
+        true
+    }.getOrDefault(false)
 }

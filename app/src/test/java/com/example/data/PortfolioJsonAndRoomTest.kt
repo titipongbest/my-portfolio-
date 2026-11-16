@@ -388,4 +388,70 @@ class PortfolioJsonAndRoomTest {
         }
         assertEquals(StockSector.OTHER.name, currentSector)
     }
+
+    @Test
+    fun jsonCodec_handlesUtf8BomNonFiniteNumbersAndOversizedPayloadSafely() {
+        val bomJson = "\uFEFF" + """
+            {
+              "holdings": [
+                {
+                  "symbol": "PTT",
+                  "category": "THAI_STOCK",
+                  "sector": "ENERGY",
+                  "quantity": 100,
+                  "buyPricePerUnit": 33.5
+                }
+              ]
+            }
+        """.trimIndent()
+        val decodedBom = PortfolioJsonCodec.decodeWithSectors(bomJson).getOrThrow()
+        assertEquals(1, decodedBom.holdings.size)
+        assertEquals("PTT", decodedBom.holdings.first().symbol)
+
+        // Reject oversized JSON cleanly without crashing
+        val oversized = "[" + " ".repeat(PortfolioJsonCodec.MAX_IMPORT_JSON_BYTES + 16) + "]"
+        assertTrue(PortfolioJsonCodec.decodeWithSectors(oversized).isFailure)
+
+        // Non-finite Double values during encode do not throw JSONException
+        val encoded = PortfolioJsonCodec.encode(
+            listOf(
+                Holding(
+                    symbol = "TEST",
+                    displayName = "Test",
+                    category = AssetCategory.THAI_STOCK.name,
+                    sector = StockSector.OTHER.name,
+                    quantity = Double.POSITIVE_INFINITY,
+                    buyPricePerUnit = Double.NaN,
+                    currency = "THB",
+                    manualCurrentPrice = Double.POSITIVE_INFINITY
+                )
+            )
+        )
+        assertTrue(encoded.contains("\"symbol\": \"TEST\""))
+
+        // Non-finite numbers (e.g., Infinity parsed by JSONObject) must fail cleanly on decode
+        val nonFiniteImport = """
+            [{"symbol": "AOT", "category": "THAI_STOCK", "quantity": 1e500, "buyPricePerUnit": 60}]
+        """.trimIndent()
+        assertTrue(PortfolioJsonCodec.decodeWithSectors(nonFiniteImport).isFailure)
+    }
+
+    @Test
+    fun viewModel_pendingExportJson_storesAndConsumesSafely() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val settingsStore = PortfolioSettingsStore(context)
+        val offlineClient = okhttp3.OkHttpClient.Builder()
+            .addInterceptor { throw java.io.IOException("Offline test client") }
+            .build()
+        val vm = com.example.ui.PortfolioViewModel(
+            repository = repository,
+            marketPriceService = MarketPriceService(offlineClient),
+            settingsStore = settingsStore
+        )
+
+        assertNull(vm.consumePendingExportJson())
+        vm.setPendingExportJson("{\"holdings\":[]}")
+        assertEquals("{\"holdings\":[]}", vm.consumePendingExportJson())
+        assertNull(vm.consumePendingExportJson())
+    }
 }

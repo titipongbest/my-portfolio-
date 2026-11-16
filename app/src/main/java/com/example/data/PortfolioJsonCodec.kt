@@ -18,6 +18,8 @@ data class PortfolioBackupPayload(
 
 object PortfolioJsonCodec {
     private const val CURRENT_SCHEMA_VERSION = 1
+    const val MAX_IMPORT_JSON_BYTES = 5 * 1024 * 1024
+    private const val MAX_IMPORT_JSON_CHARS = 5 * 1024 * 1024
 
     fun encode(
         holdings: List<Holding>,
@@ -28,16 +30,19 @@ object PortfolioJsonCodec {
         }
         val holdingsArray = JSONArray()
         for (h in holdings) {
+            val safeQuantity = h.quantity.takeIf { it.isFinite() && it > 0.0 } ?: 0.0
+            val safeBuyPrice = h.buyPricePerUnit.takeIf { it.isFinite() && it >= 0.0 } ?: 0.0
+            val safeManualPrice = h.manualCurrentPrice?.takeIf { it.isFinite() && it >= 0.0 }
             val obj = JSONObject().apply {
                 put("symbol", h.symbol)
                 put("displayName", h.displayName)
                 put("category", h.category)
                 put("sector", h.sector)
-                put("quantity", h.quantity)
-                put("buyPricePerUnit", h.buyPricePerUnit)
+                put("quantity", safeQuantity)
+                put("buyPricePerUnit", safeBuyPrice)
                 put("currency", h.currency)
-                if (h.manualCurrentPrice != null) {
-                    put("manualCurrentPrice", h.manualCurrentPrice)
+                if (safeManualPrice != null) {
+                    put("manualCurrentPrice", safeManualPrice)
                 }
                 put("createdAtMillis", h.createdAtMillis)
                 put("updatedAtMillis", h.updatedAtMillis)
@@ -75,9 +80,14 @@ object PortfolioJsonCodec {
 
     fun decodeWithSectors(jsonString: String): Result<PortfolioBackupPayload> {
         return try {
-            val trimmed = jsonString.trim()
+            val trimmed = jsonString.trimStart('\uFEFF').trim()
             if (trimmed.isEmpty()) {
                 return Result.failure(IllegalArgumentException("ไฟล์ JSON ว่างเปล่า"))
+            }
+            if (trimmed.length > MAX_IMPORT_JSON_CHARS) {
+                return Result.failure(
+                    IllegalArgumentException("ไฟล์ JSON มีขนาดใหญ่เกินไป (สูงสุด 5 MB)")
+                )
             }
 
             var rootObj: JSONObject? = null
@@ -150,14 +160,14 @@ object PortfolioJsonCodec {
                 }
 
                 val quantity = obj.optDouble("quantity", Double.NaN)
-                if (quantity.isNaN() || quantity <= 0.0) {
+                if (!quantity.isFinite() || quantity <= 0.0) {
                     return Result.failure(
                         IllegalArgumentException("รายการ $rawSymbol มีจำนวนหุ้น/หน่วย (quantity) ไม่ถูกต้อง")
                     )
                 }
 
                 val buyPrice = obj.optDouble("buyPricePerUnit", Double.NaN)
-                if (buyPrice.isNaN() || buyPrice < 0.0) {
+                if (!buyPrice.isFinite() || buyPrice < 0.0) {
                     return Result.failure(
                         IllegalArgumentException("รายการ $rawSymbol มีราคาที่ได้มา (buyPricePerUnit) ไม่ถูกต้อง")
                     )
@@ -173,7 +183,7 @@ object PortfolioJsonCodec {
 
                 val manualPrice = if (obj.has("manualCurrentPrice") && !obj.isNull("manualCurrentPrice")) {
                     obj.optDouble("manualCurrentPrice", Double.NaN)
-                        .takeIf { !it.isNaN() && it >= 0.0 }
+                        .takeIf { it.isFinite() && it >= 0.0 }
                 } else {
                     null
                 }
@@ -206,6 +216,10 @@ object PortfolioJsonCodec {
         } catch (e: Exception) {
             Result.failure(
                 IllegalArgumentException("ไม่สามารถอ่านไฟล์ JSON ได้: ${e.localizedMessage ?: "รูปแบบไม่ถูกต้อง"}")
+            )
+        } catch (_: OutOfMemoryError) {
+            Result.failure(
+                IllegalArgumentException("ไฟล์ JSON มีขนาดใหญ่หรือซับซ้อนเกินไป ไม่สามารถอ่านได้")
             )
         }
     }

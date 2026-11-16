@@ -349,29 +349,39 @@ fun MainPortfolioScreen(
                 val suggestedName = "portpulse_backup_$dateStamp.json"
                 pendingTreeExportName = suggestedName
                 suppressNextAutoLock = true
+                var lastErr: Exception? = null
                 val launchedPrimary = try {
                     exportDocumentLauncher.launch(suggestedName)
                     true
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    lastErr = e
+                    android.util.Log.w("MainPortfolioScreen", "exportDocumentLauncher failed", e)
                     false
                 }
                 if (!launchedPrimary) {
                     val launchedAny = try {
                         exportAnyDocumentLauncher.launch(suggestedName)
                         true
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        lastErr = e
+                        android.util.Log.w("MainPortfolioScreen", "exportAnyDocumentLauncher failed", e)
                         false
                     }
                     if (!launchedAny) {
                         val launchedTree = try {
                             exportTreeLauncher.launch(null)
                             true
-                        } catch (_: Exception) {
+                        } catch (e: Exception) {
+                            lastErr = e
+                            android.util.Log.w("MainPortfolioScreen", "exportTreeLauncher failed", e)
                             false
                         }
                         if (!launchedTree) {
                             suppressNextAutoLock = false
                             viewModel.consumePendingExportJson()
+                            lastErr?.let { err ->
+                                viewModel.notifyMessage("เปิด File Explorer ไม่สำเร็จ (${err::class.java.simpleName}: ${err.localizedMessage ?: err.message})")
+                            }
                             fileManagerRequest = InAppFileManagerRequest(
                                 mode = InAppFileManagerMode.EXPORT_JSON,
                                 suggestedFileName = suggestedName,
@@ -388,21 +398,29 @@ fun MainPortfolioScreen(
 
     fun triggerImportJson() {
         suppressNextAutoLock = true
+        var lastErr: Exception? = null
         val launchedPrimary = try {
             importDocumentLauncher.launch(arrayOf("*/*"))
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            lastErr = e
+            android.util.Log.w("MainPortfolioScreen", "importDocumentLauncher failed", e)
             false
         }
         if (!launchedPrimary) {
             val launchedFallback = try {
                 importGetContentLauncher.launch("*/*")
                 true
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                lastErr = e
+                android.util.Log.w("MainPortfolioScreen", "importGetContentLauncher failed", e)
                 false
             }
             if (!launchedFallback) {
                 suppressNextAutoLock = false
+                lastErr?.let { err ->
+                    viewModel.notifyMessage("เปิด File Explorer ไม่สำเร็จ (${err::class.java.simpleName}: ${err.localizedMessage ?: err.message})")
+                }
                 fileManagerRequest = InAppFileManagerRequest(
                     mode = InAppFileManagerMode.IMPORT_JSON,
                     suggestedFileName = ""
@@ -414,28 +432,38 @@ fun MainPortfolioScreen(
     fun triggerSelectAutoBackupLocation() {
         suppressNextAutoLock = true
         val fileName = "portpulse_auto_backup.json"
+        var lastErr: Exception? = null
         val launchedPrimary = try {
             autoBackupFileLauncher.launch(fileName)
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            lastErr = e
+            android.util.Log.w("MainPortfolioScreen", "autoBackupFileLauncher failed", e)
             false
         }
         if (!launchedPrimary) {
             val launchedAny = try {
                 autoBackupAnyFileLauncher.launch(fileName)
                 true
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                lastErr = e
+                android.util.Log.w("MainPortfolioScreen", "autoBackupAnyFileLauncher failed", e)
                 false
             }
             if (!launchedAny) {
                 val launchedTree = try {
                     autoBackupTreeLauncher.launch(null)
                     true
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    lastErr = e
+                    android.util.Log.w("MainPortfolioScreen", "autoBackupTreeLauncher failed", e)
                     false
                 }
                 if (!launchedTree) {
                     suppressNextAutoLock = false
+                    lastErr?.let { err ->
+                        viewModel.notifyMessage("เปิด File Explorer ไม่สำเร็จ (${err::class.java.simpleName}: ${err.localizedMessage ?: err.message})")
+                    }
                     fileManagerRequest = InAppFileManagerRequest(
                         mode = InAppFileManagerMode.SELECT_AUTO_BACKUP,
                         suggestedFileName = fileName

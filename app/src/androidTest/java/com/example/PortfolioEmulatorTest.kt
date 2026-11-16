@@ -186,7 +186,11 @@ class PortfolioEmulatorTest {
                 composeRule.onNodeWithTag("file_manager_back_button").fetchSemanticsNode()
                 true
             }.getOrDefault(false)
-            "Expected ACTION_OPEN_DOCUMENT intent after clicking backup_screen_import_button. recorded=[$recorded], fallbackOpened=$fallbackOpened"
+            val errNode = runCatching {
+                composeRule.onNode(hasText("เปิด File Explorer ไม่สำเร็จ", substring = true), useUnmergedTree = true)
+                    .fetchSemanticsNode().config
+            }.getOrNull()
+            "Expected ACTION_OPEN_DOCUMENT intent after clicking backup_screen_import_button. recorded=[$recorded], fallbackOpened=$fallbackOpened, errNode=$errNode"
         }) {
             Intents.getIntents().any { it.action == Intent.ACTION_OPEN_DOCUMENT }
         }

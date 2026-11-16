@@ -1,0 +1,75 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidHolding(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.symbol is string &&
+             data.symbol.size() >= 1 &&
+             data.symbol.size() <= 32 &&
+             data.displayName is string &&
+             data.displayName.size() >= 1 &&
+             data.displayName.size() <= 80 &&
+             data.category is string &&
+             data.category in ['THAI_STOCK', 'GLOBAL_STOCK', 'MUTUAL_FUND', 'CRYPTO'] &&
+             data.sector is string &&
+             data.sector in ['ENERGY', 'PROPERTY', 'INFRASTRUCTURE', 'FINANCE', 'TECH_ICT', 'COMMERCE', 'HEALTHCARE', 'FOOD', 'OTHER', 'NONE'] &&
+             (data.quantity is int || data.quantity is float) &&
+             data.quantity > 0 &&
+             (data.buyPricePerUnit is int || data.buyPricePerUnit is float) &&
+             data.buyPricePerUnit >= 0 &&
+             data.currency is string &&
+             data.currency in ['THB', 'USD'] &&
+             (!('manualCurrentPrice' in data) || data.manualCurrentPrice == null || ((data.manualCurrentPrice is int || data.manualCurrentPrice is float) && data.manualCurrentPrice >= 0)) &&
+             data.createdAt is timestamp &&
+             data.createdAt <= request.time &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    match /users/{userId}/holdings/{holdingId} {
+      allow get: if isOwner(userId) && isValidId(holdingId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(holdingId) &&
+                       incoming().keys().hasAll(['userId', 'symbol', 'displayName', 'category', 'sector', 'quantity', 'buyPricePerUnit', 'currency', 'createdAt']) &&
+                       incoming().keys().hasOnly(['userId', 'symbol', 'displayName', 'category', 'sector', 'quantity', 'buyPricePerUnit', 'currency', 'manualCurrentPrice', 'createdAt', 'updatedAt']) &&
+                       isValidHolding(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(holdingId) &&
+                       isValidHolding(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['symbol', 'displayName', 'category', 'sector', 'quantity', 'buyPricePerUnit', 'currency', 'manualCurrentPrice', 'updatedAt']);
+
+      allow delete: if isOwner(userId) && isValidId(holdingId);
+    }
+  }
+}

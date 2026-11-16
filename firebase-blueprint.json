@@ -1,0 +1,90 @@
+{
+  "entities": {
+    "Holding": {
+      "title": "Holding",
+      "description": "An investment portfolio holding entered by the user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID"
+        },
+        "symbol": {
+          "type": "string",
+          "description": "Asset ticker or symbol (e.g., PTT, AOT, BTC, K-USA-A(A))"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable name of the asset"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["THAI_STOCK", "GLOBAL_STOCK", "MUTUAL_FUND", "CRYPTO"],
+          "description": "Investment asset category"
+        },
+        "sector": {
+          "type": "string",
+          "enum": [
+            "ENERGY",
+            "PROPERTY",
+            "INFRASTRUCTURE",
+            "FINANCE",
+            "TECH_ICT",
+            "COMMERCE",
+            "HEALTHCARE",
+            "FOOD",
+            "OTHER",
+            "NONE"
+          ],
+          "description": "Stock industry sector (NONE for non-stock categories)"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Number of shares or units held"
+        },
+        "buyPricePerUnit": {
+          "type": "number",
+          "description": "Average acquisition cost per unit in the selected currency"
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["THB", "USD"],
+          "description": "Currency of buyPricePerUnit"
+        },
+        "manualCurrentPrice": {
+          "type": "number",
+          "description": "Optional user-supplied current price or NAV when live quote is unavailable"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp submitted via FieldValue.serverTimestamp()"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp submitted via FieldValue.serverTimestamp()"
+        }
+      },
+      "required": [
+        "userId",
+        "symbol",
+        "displayName",
+        "category",
+        "sector",
+        "quantity",
+        "buyPricePerUnit",
+        "currency",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/holdings/{holdingId}": {
+      "schema": {
+        "$ref": "#/entities/Holding"
+      },
+      "description": "Per-user investment portfolio holdings"
+    }
+  }
+}

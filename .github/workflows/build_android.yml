@@ -25,13 +25,17 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Set up Android SDK & Accept Licenses
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK 36.1 & Build Tools
+      - name: Accept Android SDK licenses and install SDK 36.1
         run: |
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager "platform-tools" "platforms;android-36.1" "platforms;android-36" "build-tools;36.0.0"
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(command -v sdkmanager)"
+          fi
+          echo "Using sdkmanager: $SDKMANAGER"
+          set +o pipefail
+          yes | "$SDKMANAGER" --licenses > /dev/null
+          yes | "$SDKMANAGER" "platform-tools" "platforms;android-36.1" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Prepare debug keystore
         run: |

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -53,6 +54,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -92,7 +95,16 @@ fun BackupScreenDialog(
     }
 
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Main)
+                        event.changes.forEach { it.consume() }
+                    }
+                }
+            },
         color = MaterialTheme.colorScheme.background
     ) {
         BackHandler { onDismiss() }
@@ -280,7 +292,7 @@ fun BackupScreenDialog(
                                         shape = RoundedCornerShape(12.dp),
                                         modifier = Modifier
                                             .weight(1f)
-                                            .height(48.dp)
+                                            .heightIn(min = 48.dp)
                                             .testTag("change_auto_backup_location_button")
                                     ) {
                                         Icon(
@@ -300,7 +312,7 @@ fun BackupScreenDialog(
                                         shape = RoundedCornerShape(12.dp),
                                         modifier = Modifier
                                             .weight(1f)
-                                            .height(48.dp)
+                                            .heightIn(min = 48.dp)
                                             .testTag("run_auto_backup_now_button")
                                     ) {
                                         Icon(
@@ -327,7 +339,7 @@ fun BackupScreenDialog(
                                     shape = RoundedCornerShape(14.dp),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(50.dp)
+                                        .heightIn(min = 50.dp)
                                         .testTag("select_auto_backup_location_button")
                                 ) {
                                     Icon(
@@ -338,7 +350,8 @@ fun BackupScreenDialog(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = "เลือกตำแหน่งผ่าน File Explorer",
-                                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                        softWrap = true
                                     )
                                 }
                             }
@@ -463,10 +476,14 @@ private fun BackupActionCard(
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .heightIn(min = 48.dp)
                         .testTag(buttonTag)
                 ) {
-                    Text(buttonLabel, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
+                    Text(
+                        text = buttonLabel,
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                        softWrap = true
+                    )
                 }
             } else {
                 OutlinedButton(
@@ -474,7 +491,7 @@ private fun BackupActionCard(
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .heightIn(min = 48.dp)
                         .testTag(buttonTag)
                 ) {
                     Icon(
@@ -483,7 +500,11 @@ private fun BackupActionCard(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(buttonLabel, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold))
+                    Text(
+                        text = buttonLabel,
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                        softWrap = true
+                    )
                 }
             }
         }

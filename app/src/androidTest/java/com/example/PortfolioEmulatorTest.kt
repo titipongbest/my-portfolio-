@@ -95,6 +95,9 @@ class PortfolioEmulatorTest {
             composeRule.onNode(hasText("ชนิดสินทรัพย์หลัก • ครอบคลุมทุกเมนู") and inHeader, useUnmergedTree = true)
         )
         assertTextNotTruncated(
+            composeRule.onNode(hasText("0 รายการ") and inHeader, useUnmergedTree = true)
+        )
+        assertTextNotTruncated(
             composeRule.onNode(hasText("เปลี่ยน") and inHeader, useUnmergedTree = true)
         )
 
@@ -102,6 +105,12 @@ class PortfolioEmulatorTest {
             composeRule.onNodeWithTag("top_category_dropdown").performClick()
             composeRule.waitForIdle()
 
+            assertTextNotTruncated(
+                composeRule.onNode(
+                    hasText(category.labelTh) and hasAnyAncestor(hasTestTag("top_dropdown_${category.name}")),
+                    useUnmergedTree = true
+                )
+            )
             composeRule.onNodeWithTag("top_dropdown_${category.name}").assertIsDisplayed().performClick()
             composeRule.waitForIdle()
 
@@ -168,8 +177,19 @@ class PortfolioEmulatorTest {
         composeRule.onNodeWithTag("backup_screen_import_button")
             .performScrollTo()
             .assertIsDisplayed()
-            .performClick()
         composeRule.waitForIdle()
+        composeRule.onNodeWithTag("backup_screen_import_button").performClick()
+        composeRule.waitForIdle()
+        waitUntilCondition(5_000, failureDetails = {
+            val recorded = Intents.getIntents().joinToString(" | ") { "${it.action}:${it.type}:${it.component}" }
+            val fallbackOpened = runCatching {
+                composeRule.onNodeWithTag("file_manager_back_button").fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+            "Expected ACTION_OPEN_DOCUMENT intent after clicking backup_screen_import_button. recorded=[$recorded], fallbackOpened=$fallbackOpened"
+        }) {
+            Intents.getIntents().any { it.action == Intent.ACTION_OPEN_DOCUMENT }
+        }
         Intents.intended(IntentMatchers.hasAction(Intent.ACTION_OPEN_DOCUMENT))
         composeRule.waitUntil(timeoutMillis = 5_000) {
             runCatching {
@@ -200,7 +220,8 @@ class PortfolioEmulatorTest {
         composeRule.onNodeWithTag("backup_screen_export_button")
             .performScrollTo()
             .assertIsDisplayed()
-            .performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("backup_screen_export_button").performClick()
         waitUntilCondition(5_000) { exportFile.exists() && exportFile.length() > 10 }
         val exportedText = exportFile.readText(Charsets.UTF_8)
         assertTrue(exportedText.contains("\"PTT\""))
@@ -221,7 +242,8 @@ class PortfolioEmulatorTest {
         composeRule.onNodeWithTag("select_auto_backup_location_button")
             .performScrollTo()
             .assertIsDisplayed()
-            .performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("select_auto_backup_location_button").performClick()
         waitUntilCondition(5_000) { autoFile.exists() && autoFile.length() > 10 }
         val autoText = autoFile.readText(Charsets.UTF_8)
         assertTrue(autoText.contains("\"PTT\""))
@@ -262,25 +284,30 @@ class PortfolioEmulatorTest {
                 "Text '${node.config}' was ellipsized on line $line",
                 layout.isLineEllipsized(line)
             )
+            val lineWidthPx = layout.getLineWidth(line)
+            assertTrue(
+                "Text '${node.config}' line $line overflowed container width (${lineWidthPx}px > sizeW=${layout.size.width}px)",
+                lineWidthPx <= layout.size.width.toFloat() + 2.0f
+            )
         }
         assertFalse(
             "Text '${node.config}' overflowed vertically (lineCount=${layout.lineCount})",
             layout.didOverflowHeight
         )
-        val horizontalOverflowPx = layout.multiParagraph.width - layout.size.width.toFloat()
-        assertTrue(
-            "Text '${node.config}' overflowed horizontally by ${horizontalOverflowPx}px (sizeW=${layout.size.width}, paraW=${layout.multiParagraph.width})",
-            horizontalOverflowPx <= 2.0f
-        )
     }
 
-    private fun waitUntilCondition(timeoutMillis: Long, condition: () -> Boolean) {
+    private fun waitUntilCondition(
+        timeoutMillis: Long,
+        failureDetails: (() -> String)? = null,
+        condition: () -> Boolean
+    ) {
         val deadline = System.currentTimeMillis() + timeoutMillis
         while (System.currentTimeMillis() < deadline) {
             composeRule.waitForIdle()
             if (condition()) return
             Thread.sleep(100)
         }
-        assertTrue("Timed out after ${timeoutMillis}ms waiting for condition", condition())
+        val msg = failureDetails?.invoke() ?: "Timed out after ${timeoutMillis}ms waiting for condition"
+        assertTrue(msg, condition())
     }
 }

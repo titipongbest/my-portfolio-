@@ -65,8 +65,8 @@ import com.example.model.AssetCategory
 import com.example.model.Holding
 import com.example.ui.FormatUtils
 import com.example.ui.theme.LocalPortfolioColors
-import com.example.ui.theme.categoryAccentColor
 import com.example.ui.theme.categoryContainerColor
+import com.example.ui.theme.categoryOnContainerColor
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -382,8 +382,8 @@ fun BackupScreenDialog(
                                     ) {
                                         Text(
                                             text = "${cat.shortLabelTh}: $count",
-                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                                            color = categoryAccentColor(cat),
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = categoryOnContainerColor(cat),
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                         )
                                     }

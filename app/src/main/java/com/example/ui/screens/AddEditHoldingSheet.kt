@@ -79,6 +79,7 @@ import com.example.ui.theme.LocalPortfolioColors
 import com.example.ui.theme.NumericStyleMedium
 import com.example.ui.theme.categoryAccentColor
 import com.example.ui.theme.categoryContainerColor
+import com.example.ui.theme.categoryOnContainerColor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -232,6 +233,7 @@ fun AddEditHoldingSheet(
             // Sheet Title Header + Active Category Badge
             val catAccent = categoryAccentColor(selectedCategory)
             val catBg = categoryContainerColor(selectedCategory)
+            val catOnBg = categoryOnContainerColor(selectedCategory)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -260,14 +262,14 @@ fun AddEditHoldingSheet(
                             Icon(
                                 imageVector = categoryIcon(selectedCategory),
                                 contentDescription = selectedCategory.labelTh,
-                                tint = catAccent,
+                                tint = catOnBg,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "หมวดหมู่: ${selectedCategory.labelTh}",
                                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                color = catAccent
+                                color = catOnBg
                             )
                         }
                     }

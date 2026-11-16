@@ -114,6 +114,7 @@ import com.example.ui.PortfolioViewModel
 import com.example.ui.theme.LocalPortfolioColors
 import com.example.ui.theme.categoryAccentColor
 import com.example.ui.theme.categoryContainerColor
+import com.example.ui.theme.categoryOnContainerColor
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -980,7 +981,7 @@ private fun TopCategoryDropdownBar(
     val activeCount = allHoldings.count { it.assetCategory == selectedCategory }
     val activeLabel = selectedCategory.labelTh
     val activeIcon = categoryMenuIcon(selectedCategory)
-    val activeAccent = categoryAccentColor(selectedCategory)
+    val activeOnContainer = categoryOnContainerColor(selectedCategory)
     val headerBg = MaterialTheme.colorScheme.primary
     val headerFg = MaterialTheme.colorScheme.onPrimary
 
@@ -1002,8 +1003,8 @@ private fun TopCategoryDropdownBar(
             ) {
                 Text(
                     text = "ชนิดสินทรัพย์หลัก • ครอบคลุมทุกเมนู",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = headerFg.copy(alpha = 0.9f),
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = headerFg,
                     softWrap = true,
                     modifier = Modifier
                         .weight(1f)
@@ -1011,12 +1012,13 @@ private fun TopCategoryDropdownBar(
                 )
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, activeOnContainer.copy(alpha = 0.25f))
                 ) {
                     Text(
                         text = "$activeCount รายการ",
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                        color = activeAccent,
+                        color = activeOnContainer,
                         modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
                     )
                 }
@@ -1026,19 +1028,20 @@ private fun TopCategoryDropdownBar(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surface),
-                    contentAlignment = Alignment.Center
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, activeOnContainer.copy(alpha = 0.2f)),
+                    modifier = Modifier.size(40.dp)
                 ) {
-                    Icon(
-                        imageVector = activeIcon,
-                        contentDescription = activeLabel,
-                        tint = activeAccent,
-                        modifier = Modifier.size(22.dp)
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = activeIcon,
+                            contentDescription = activeLabel,
+                            tint = activeOnContainer,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
@@ -1051,9 +1054,9 @@ private fun TopCategoryDropdownBar(
                         .padding(end = 8.dp)
                 )
                 Surface(
-                    color = headerFg.copy(alpha = 0.16f),
+                    color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(1.dp, headerFg.copy(alpha = 0.45f))
+                    border = BorderStroke(1.dp, activeOnContainer.copy(alpha = 0.3f))
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -1062,13 +1065,13 @@ private fun TopCategoryDropdownBar(
                         Text(
                             text = "เปลี่ยน",
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            color = headerFg
+                            color = activeOnContainer
                         )
                         Spacer(modifier = Modifier.width(2.dp))
                         Icon(
                             imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                             contentDescription = "เปิดเมนูเลือกหมวดหมู่",
-                            tint = headerFg,
+                            tint = activeOnContainer,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -1115,6 +1118,7 @@ private fun CategoryDropdownRow(
 ) {
     val itemAccent = categoryAccentColor(category)
     val itemContainer = categoryContainerColor(category)
+    val itemOnContainer = categoryOnContainerColor(category)
 
     DropdownMenuItem(
         text = {
@@ -1128,7 +1132,7 @@ private fun CategoryDropdownRow(
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                     ),
-                    color = if (isSelected) itemAccent else MaterialTheme.colorScheme.onSurface,
+                    color = if (isSelected) itemOnContainer else MaterialTheme.colorScheme.onSurface,
                     softWrap = true,
                     modifier = Modifier
                         .weight(1f)
@@ -1141,7 +1145,7 @@ private fun CategoryDropdownRow(
                     Text(
                         text = "$count",
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                        color = if (isSelected) Color.White else itemAccent,
+                        color = if (isSelected) Color.White else itemOnContainer,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                     )
                 }
@@ -1151,7 +1155,7 @@ private fun CategoryDropdownRow(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = itemAccent
+                tint = itemOnContainer
             )
         },
         trailingIcon = if (isSelected) {
@@ -1159,14 +1163,14 @@ private fun CategoryDropdownRow(
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = "กำลังเลือก",
-                    tint = itemAccent
+                    tint = itemOnContainer
                 )
             }
         } else null,
         onClick = onClick,
         modifier = Modifier
             .background(
-                if (isSelected) itemContainer.copy(alpha = 0.55f)
+                if (isSelected) itemContainer.copy(alpha = 0.65f)
                 else MaterialTheme.colorScheme.surface
             )
             .testTag(testTag)

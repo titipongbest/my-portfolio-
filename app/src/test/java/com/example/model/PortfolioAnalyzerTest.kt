@@ -275,4 +275,41 @@ class PortfolioAnalyzerTest {
         assertEquals(StockSector.OTHER.labelTh, slice.labelTh)
         assertEquals(StockSector.OTHER.shortLabelTh, slice.shortLabelTh)
     }
+
+    @Test
+    fun categoryColors_meetWcagAaContrastForReadability() {
+        fun contrastRatio(fg: androidx.compose.ui.graphics.Color, bg: androidx.compose.ui.graphics.Color): Double {
+            fun linearize(c: Float): Double {
+                val d = c.toDouble()
+                return if (d <= 0.03928) d / 12.92 else Math.pow((d + 0.055) / 1.055, 2.4)
+            }
+            fun lum(col: androidx.compose.ui.graphics.Color): Double =
+                0.2126 * linearize(col.red) + 0.7152 * linearize(col.green) + 0.0722 * linearize(col.blue)
+            val l1 = lum(fg)
+            val l2 = lum(bg)
+            return (maxOf(l1, l2) + 0.05) / (minOf(l1, l2) + 0.05)
+        }
+
+        val white = androidx.compose.ui.graphics.Color.White
+        val headerPairs = listOf(
+            AssetCategory.THAI_STOCK to (white to com.example.ui.theme.StockOrangePrimary),
+            AssetCategory.GLOBAL_STOCK to (white to com.example.ui.theme.GlobalPurplePrimary),
+            AssetCategory.CRYPTO to (com.example.ui.theme.DarkInkOnYellow to com.example.ui.theme.CryptoYellowPrimary),
+            AssetCategory.GOLD to (white to com.example.ui.theme.GoldBluePrimary),
+            AssetCategory.MUTUAL_FUND to (white to com.example.ui.theme.FundGreenPrimary)
+        )
+        headerPairs.forEach { (cat, pair) ->
+            val (fg, bg) = pair
+            val headerContrast = contrastRatio(fg, bg)
+            assertTrue("Header contrast for $cat was $headerContrast", headerContrast >= 4.5)
+
+            val onContainer = com.example.ui.theme.categoryOnContainerColor(cat)
+            val container = com.example.ui.theme.categoryContainerColor(cat)
+            val accent = com.example.ui.theme.categoryAccentColor(cat)
+
+            assertTrue("On-white pill contrast for $cat was too low", contrastRatio(onContainer, white) >= 4.5)
+            assertTrue("On-container contrast for $cat was too low", contrastRatio(onContainer, container) >= 4.5)
+            assertTrue("White-on-accent contrast for $cat was too low", contrastRatio(white, accent) >= 4.5)
+        }
+    }
 }

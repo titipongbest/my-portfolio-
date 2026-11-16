@@ -329,4 +329,63 @@ class PortfolioJsonAndRoomTest {
         assertEquals(false, settingsStore.securityConfig.value.isPinEnabled)
         assertEquals(PinVerifyResult.NotConfigured, settingsStore.verifyPin("2580"))
     }
+
+    @Test
+    fun resolveBestFinnomenaMatch_doesNotHijackShortEtfTickers() {
+        val entries = listOf(
+            FinnomenaFundEntry("F1", "SPYGOLD", "กองทุนทองคำสมมติ"),
+            FinnomenaFundEntry("F2", "K-USA-A(A)", "กองทุนเปิดเค ยูเอสเอ"),
+            FinnomenaFundEntry("F3", "SCBROBOA", "กองทุนเปิดไทยพาณิชย์ โกลบอลโรโบติกส์")
+        )
+
+        // Short US ETF ticker "SPY" must NOT match "SPYGOLD"
+        assertNull(MarketPriceService.resolveBestFinnomenaMatch(entries, "SPY"))
+
+        // Thai fund base code with hyphen delimiter matches cleanly
+        assertEquals("F2", MarketPriceService.resolveBestFinnomenaMatch(entries, "K-USA")?.fundId)
+        assertEquals("F3", MarketPriceService.resolveBestFinnomenaMatch(entries, "scbrobo")?.fundId)
+    }
+
+    @Test
+    fun resetDefaultSectors_reassignsOrphanedCustomSectorHoldingsToOther() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = context.getSharedPreferences("portpulse_settings", Context.MODE_PRIVATE)
+        prefs.edit().clear().commit()
+
+        val settingsStore = PortfolioSettingsStore(context)
+        val customSector = settingsStore.addSector("กลุ่มทดสอบ").getOrThrow()
+
+        repository.addHolding(
+            Holding(
+                symbol = "PTT",
+                displayName = "ปตท.",
+                category = AssetCategory.THAI_STOCK.name,
+                sector = customSector.id,
+                quantity = 100.0,
+                buyPricePerUnit = 33.0,
+                currency = "THB"
+            )
+        ).getOrThrow()
+
+        val offlineClient = okhttp3.OkHttpClient.Builder()
+            .addInterceptor { throw java.io.IOException("Offline test client") }
+            .build()
+        val vm = com.example.ui.PortfolioViewModel(
+            repository = repository,
+            marketPriceService = MarketPriceService(offlineClient),
+            settingsStore = settingsStore
+        )
+        vm.resetDefaultSectors()
+
+        // Wait briefly for ViewModel coroutine + Room executor reassignment
+        val deadline = System.currentTimeMillis() + 3_000L
+        var currentSector = customSector.id
+        while (System.currentTimeMillis() < deadline) {
+            org.robolectric.shadows.ShadowLooper.idleMainLooper()
+            currentSector = repository.getHoldingsOnce().first().sector
+            if (currentSector == StockSector.OTHER.name) break
+            kotlinx.coroutines.delay(25L)
+        }
+        assertEquals(StockSector.OTHER.name, currentSector)
+    }
 }

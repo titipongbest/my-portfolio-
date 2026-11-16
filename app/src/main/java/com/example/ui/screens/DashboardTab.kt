@@ -261,7 +261,7 @@ private fun HeroPortfolioCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "${FormatUtils.formatUpdatedTime(lastUpdatedMillis)} • 1 USD = ฿${String.format("%.2f", usdToThbRate)}${if (isLiveFxRate) "" else "*"}",
+                        text = "${FormatUtils.formatUpdatedTime(lastUpdatedMillis)} • 1 USD = ฿${String.format(java.util.Locale.US, "%.2f", usdToThbRate)}${if (isLiveFxRate) "" else "*"}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

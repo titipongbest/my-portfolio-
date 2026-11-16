@@ -197,4 +197,82 @@ class PortfolioAnalyzerTest {
         val globalAccent = com.example.ui.theme.categoryAccentColor(AssetCategory.GLOBAL_STOCK)
         assertTrue(thaiAccent != globalAccent)
     }
+
+    @Test
+    fun knownCatalogFindMatch_doesNotCrossMatchAcrossCategories() {
+        val thaiEa = com.example.data.KnownAssetsCatalog.findMatch("EA", AssetCategory.THAI_STOCK)
+        assertEquals("EA.BK", thaiEa?.yahooTicker)
+
+        // US Electronic Arts ("EA") must not match Thai stock EA.BK
+        val globalEa = com.example.data.KnownAssetsCatalog.findMatch("EA", AssetCategory.GLOBAL_STOCK)
+        assertEquals(null, globalEa)
+
+        // Crypto supports optional -USD suffix within CRYPTO category only
+        val btc = com.example.data.KnownAssetsCatalog.findMatch("BTC-USD", AssetCategory.CRYPTO)
+        assertEquals("bitcoin", btc?.coinGeckoId)
+        assertEquals(null, com.example.data.KnownAssetsCatalog.findMatch("BTC", AssetCategory.THAI_STOCK))
+    }
+
+    @Test
+    fun analyze_usesUpdatedManualPriceWhenSnapshotHasStaleManualQuote() {
+        val fund = Holding(
+            id = 10L,
+            symbol = "GOLD965",
+            displayName = "ทองคำแท่ง",
+            category = AssetCategory.GOLD.name,
+            sector = StockSector.NONE.name,
+            quantity = 2.0,
+            buyPricePerUnit = 40_000.0,
+            currency = "THB",
+            manualCurrentPrice = 44_000.0
+        )
+        val staleSnapshot = MarketSnapshot(
+            usdToThbRate = 35.0,
+            quotes = mapOf(
+                "GOLD:GOLD965" to LiveQuote(
+                    key = "GOLD:GOLD965",
+                    symbol = "GOLD965",
+                    currentPriceOriginal = 41_000.0,
+                    originalCurrency = "THB",
+                    currentPriceThb = 41_000.0,
+                    source = QuoteSource.MANUAL
+                )
+            )
+        )
+
+        val updatedSummary = PortfolioAnalyzer.analyze(listOf(fund), staleSnapshot)
+        val analyzed = updatedSummary.analyzedHoldings.single()
+        assertEquals(44_000.0, analyzed.effectiveCurrentPriceThb, 0.01)
+        assertEquals(88_000.0, analyzed.currentValueThb, 0.01)
+        assertEquals(QuoteSource.MANUAL, analyzed.priceSource)
+
+        // Clearing manualCurrentPrice falls back to cost basis rather than stale snapshot manual quote
+        val cleared = fund.copy(manualCurrentPrice = null)
+        val clearedSummary = PortfolioAnalyzer.analyze(listOf(cleared), staleSnapshot)
+        val clearedAnalyzed = clearedSummary.analyzedHoldings.single()
+        assertEquals(40_000.0, clearedAnalyzed.effectiveCurrentPriceThb, 0.01)
+        assertEquals(QuoteSource.UNAVAILABLE, clearedAnalyzed.priceSource)
+        assertTrue(clearedAnalyzed.isEstimatedUsingCost)
+    }
+
+    @Test
+    fun analyze_orphanedCustomSectorFallsBackToOtherLabel() {
+        val holding = Holding(
+            id = 11L,
+            symbol = "PTT",
+            displayName = "ปตท.",
+            category = AssetCategory.THAI_STOCK.name,
+            sector = "CUSTOM_999999",
+            quantity = 100.0,
+            buyPricePerUnit = 33.0,
+            currency = "THB"
+        )
+        val defaultSectors = StockSector.defaultManagedSectors()
+        assertEquals(StockSector.OTHER.shortLabelTh, holding.resolveSectorLabel(defaultSectors))
+
+        val summary = PortfolioAnalyzer.analyze(listOf(holding), MarketSnapshot(), defaultSectors)
+        val slice = summary.stockSectorSlices.single()
+        assertEquals(StockSector.OTHER.labelTh, slice.labelTh)
+        assertEquals(StockSector.OTHER.shortLabelTh, slice.shortLabelTh)
+    }
 }

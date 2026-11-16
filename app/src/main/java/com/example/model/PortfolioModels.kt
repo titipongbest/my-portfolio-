@@ -71,6 +71,7 @@ data class Holding(
         if (!assetCategory.isStock) return "-"
         managedSectors.firstOrNull { it.id == sector }?.let { return it.label }
         StockSector.entries.find { it.name == sector && it != StockSector.NONE }?.let { return it.shortLabelTh }
-        return sector.takeIf { it.isNotBlank() && it != StockSector.NONE.name } ?: StockSector.OTHER.shortLabelTh
+        return sector.takeIf { it.isNotBlank() && it != StockSector.NONE.name && !it.startsWith("CUSTOM_") }
+            ?: StockSector.OTHER.shortLabelTh
     }
 }

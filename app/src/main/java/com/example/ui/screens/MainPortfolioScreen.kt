@@ -82,6 +82,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -678,11 +680,21 @@ fun MainPortfolioScreen(
     }
 
     if (isAppLocked && uiState.securityConfig.isPinEnabled) {
-        PinLockScreen(
-            securityConfig = uiState.securityConfig,
-            onVerifyPin = viewModel::unlockWithPin,
-            onBiometricUnlockSuccess = viewModel::unlockWithBiometric
-        )
+        Dialog(
+            onDismissRequest = {},
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false
+            )
+        ) {
+            PinLockScreen(
+                securityConfig = uiState.securityConfig,
+                onVerifyPin = viewModel::unlockWithPin,
+                onBiometricUnlockSuccess = viewModel::unlockWithBiometric
+            )
+        }
     }
 }
 

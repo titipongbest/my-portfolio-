@@ -96,7 +96,10 @@ object PortfolioAnalyzer {
             }
 
             val (priceOrig, priceThb, source, isFallbackCost) = when {
-                quote != null && quote.currentPriceThb > 0.0 && quote.source != QuoteSource.UNAVAILABLE -> {
+                quote != null &&
+                    quote.currentPriceThb > 0.0 &&
+                    quote.source != QuoteSource.UNAVAILABLE &&
+                    quote.source != QuoteSource.MANUAL -> {
                     Quad(quote.currentPriceOriginal, quote.currentPriceThb, quote.source, false)
                 }
                 manualPrice != null && manualPriceThb != null -> {
@@ -177,10 +180,10 @@ object PortfolioAnalyzer {
                 val managed = sectorMap[sectorKey]
                 val fullLabel = managed?.fullLabel
                     ?: StockSector.entries.find { it.name == sectorKey && it != StockSector.NONE }?.labelTh
-                    ?: sectorKey
+                    ?: if (sectorKey.startsWith("CUSTOM_")) StockSector.OTHER.labelTh else sectorKey
                 val shortLabel = managed?.label
                     ?: StockSector.entries.find { it.name == sectorKey && it != StockSector.NONE }?.shortLabelTh
-                    ?: sectorKey
+                    ?: if (sectorKey.startsWith("CUSTOM_")) StockSector.OTHER.shortLabelTh else sectorKey
 
                 SectorSlice(
                     sectorId = sectorKey,

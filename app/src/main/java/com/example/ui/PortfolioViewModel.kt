@@ -172,7 +172,12 @@ class PortfolioViewModel(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-        initialValue = PortfolioUiState(isLoading = true)
+        initialValue = PortfolioUiState(
+            isLoading = true,
+            managedSectors = settingsStore.managedSectors.value,
+            autoBackupConfig = settingsStore.autoBackupConfig.value,
+            securityConfig = settingsStore.securityConfig.value
+        )
     )
 
     init {
@@ -389,6 +394,16 @@ class PortfolioViewModel(
 
     fun resetDefaultSectors() {
         settingsStore.resetDefaultSectors()
+        val validIds = settingsStore.managedSectors.value.map { it.id }.toSet()
+        viewModelScope.launch {
+            val orphanedIds = repository.getHoldingsOnce()
+                .filter { it.assetCategory.isStock && it.sector !in validIds }
+                .map { it.sector }
+                .distinct()
+            orphanedIds.forEach { oldId ->
+                repository.reassignSector(oldId, StockSector.OTHER.name)
+            }
+        }
         _actionMessage.value = "คืนค่ากลุ่มอุตสาหกรรมเริ่มต้นแล้ว"
     }
 

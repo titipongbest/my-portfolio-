@@ -178,9 +178,13 @@ object KnownAssetsCatalog {
 
     fun findMatch(symbol: String, category: AssetCategory): KnownAsset? {
         val clean = symbol.trim().uppercase().removeSuffix(".BK")
+        val cleanCrypto = if (category == AssetCategory.CRYPTO) clean.removeSuffix("-USD") else clean
         return allAssets.firstOrNull {
-            it.category == category && it.symbol.uppercase().removeSuffix(".BK") == clean
-        } ?: allAssets.firstOrNull { it.symbol.uppercase().removeSuffix(".BK") == clean }
+            it.category == category && (
+                it.symbol.uppercase().removeSuffix(".BK") == clean ||
+                    it.symbol.uppercase() == cleanCrypto
+                )
+        }
     }
 
     private fun normalizeCode(raw: String): String =

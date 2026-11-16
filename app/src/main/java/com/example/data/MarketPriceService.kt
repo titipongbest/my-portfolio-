@@ -469,8 +469,11 @@ class MarketPriceService(
             }
         }.distinct()
 
-        // For Thai Mutual Funds (without a known Yahoo ticker), try Finnomena NAV first
-        if (holding.assetCategory == AssetCategory.MUTUAL_FUND && known?.yahooTicker == null) {
+        // For known Thai Mutual Funds (without a Yahoo ticker) or Thai-style fund codes (e.g. K-USA, SCBNDQ(A)), try Finnomena NAV first
+        val looksLikeThaiFundCode = (known != null && known.yahooTicker == null) ||
+            clean.contains("-") ||
+            clean.contains("(")
+        if (holding.assetCategory == AssetCategory.MUTUAL_FUND && looksLikeThaiFundCode) {
             val fundQuote = queryFinnomenaFundNav(clean)
             if (fundQuote != null && fundQuote.price > 0.0) {
                 return LiveQuote(
@@ -719,7 +722,16 @@ class MarketPriceService(
                 ?: entries.firstOrNull { it.shortCode.equals("${clean}A", ignoreCase = true) }
                 ?: entries.firstOrNull { it.shortCode.equals("${clean}(A)", ignoreCase = true) }
                 ?: entries.firstOrNull { it.shortCode.equals("${clean}-A", ignoreCase = true) }
-                ?: entries.firstOrNull { it.shortCode.startsWith(clean, ignoreCase = true) }
+                ?: entries.firstOrNull {
+                    it.shortCode.startsWith("${clean}-", ignoreCase = true) ||
+                        it.shortCode.startsWith("${clean}(", ignoreCase = true) ||
+                        it.shortCode.startsWith("${clean} ", ignoreCase = true)
+                }
+                ?: if (clean.length >= 5) {
+                    entries.firstOrNull { it.shortCode.startsWith(clean, ignoreCase = true) }
+                } else {
+                    null
+                }
         }
 
         internal fun parseFinnomenaNavChartJson(jsonBody: String): RawChartQuote? {

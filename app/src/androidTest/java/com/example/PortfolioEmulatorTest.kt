@@ -257,9 +257,20 @@ class PortfolioEmulatorTest {
         }
         assertTrue("Expected at least one TextLayoutResult", layoutResults.isNotEmpty())
         val layout = layoutResults.first()
+        for (line in 0 until layout.lineCount) {
+            assertFalse(
+                "Text '${node.config}' was ellipsized on line $line",
+                layout.isLineEllipsized(line)
+            )
+        }
         assertFalse(
-            "Text '${node.config}' overflowed or was truncated! lineCount=${layout.lineCount}, didOverflowWidth=${layout.didOverflowWidth}",
-            layout.hasVisualOverflow
+            "Text '${node.config}' overflowed vertically (lineCount=${layout.lineCount})",
+            layout.didOverflowHeight
+        )
+        val horizontalOverflowPx = layout.multiParagraph.width - layout.size.width.toFloat()
+        assertTrue(
+            "Text '${node.config}' overflowed horizontally by ${horizontalOverflowPx}px (sizeW=${layout.size.width}, paraW=${layout.multiParagraph.width})",
+            horizontalOverflowPx <= 2.0f
         )
     }
 

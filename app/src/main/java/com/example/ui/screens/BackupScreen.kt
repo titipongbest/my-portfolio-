@@ -26,8 +26,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Save
@@ -46,7 +44,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -81,9 +78,7 @@ fun BackupScreenDialog(
     onSelectAutoBackupLocation: () -> Unit,
     onRunAutoBackupNow: () -> Unit,
     onExportJsonClick: () -> Unit,
-    onExportCopyShareClick: () -> Unit,
     onImportJsonClick: () -> Unit,
-    onImportPasteJsonClick: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val portfolioColors = LocalPortfolioColors.current
@@ -360,10 +355,6 @@ fun BackupScreenDialog(
                         buttonTag = "backup_screen_export_button",
                         isPrimaryButton = false,
                         onClick = onExportJsonClick,
-                        secondaryActionLabel = "คัดลอก / แชร์ข้อความ JSON",
-                        secondaryActionIcon = Icons.Default.ContentCopy,
-                        secondaryActionTag = "backup_screen_export_text_button",
-                        onSecondaryActionClick = onExportCopyShareClick,
                         extraContent = {
                             FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -397,11 +388,7 @@ fun BackupScreenDialog(
                         buttonLabel = "นำเข้าไฟล์ JSON",
                         buttonTag = "backup_screen_import_button",
                         isPrimaryButton = false,
-                        onClick = onImportJsonClick,
-                        secondaryActionLabel = "วางข้อความ JSON เพื่อนำเข้า",
-                        secondaryActionIcon = Icons.Default.ContentPaste,
-                        secondaryActionTag = "backup_screen_import_paste_button",
-                        onSecondaryActionClick = onImportPasteJsonClick
+                        onClick = onImportJsonClick
                     )
                 }
 
@@ -420,10 +407,6 @@ private fun BackupActionCard(
     buttonTag: String,
     isPrimaryButton: Boolean,
     onClick: () -> Unit,
-    secondaryActionLabel: String? = null,
-    secondaryActionIcon: ImageVector? = null,
-    secondaryActionTag: String? = null,
-    onSecondaryActionClick: (() -> Unit)? = null,
     extraContent: (@Composable () -> Unit)? = null
 ) {
     val portfolioColors = LocalPortfolioColors.current
@@ -500,31 +483,6 @@ private fun BackupActionCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(buttonLabel, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold))
-                }
-            }
-
-            if (secondaryActionLabel != null && onSecondaryActionClick != null) {
-                Spacer(modifier = Modifier.height(6.dp))
-                TextButton(
-                    onClick = onSecondaryActionClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .let { mod ->
-                            if (secondaryActionTag != null) mod.testTag(secondaryActionTag) else mod
-                        }
-                ) {
-                    if (secondaryActionIcon != null) {
-                        Icon(
-                            imageVector = secondaryActionIcon,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                    }
-                    Text(
-                        text = secondaryActionLabel,
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
-                    )
                 }
             }
         }

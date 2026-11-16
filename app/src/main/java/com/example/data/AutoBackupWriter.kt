@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import java.io.File
 import java.io.FileOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,6 +21,19 @@ class AndroidAutoBackupWriter(context: Context) : AutoBackupWriter {
             runCatching {
                 val uri = Uri.parse(uriString)
                 val bytes = json.toByteArray(Charsets.UTF_8)
+
+                if (uri.scheme == "file") {
+                    val path = uri.path?.takeIf { it.isNotBlank() }
+                        ?: error("ไม่พบตำแหน่งไฟล์สำหรับบันทึก")
+                    val targetFile = File(path)
+                    targetFile.parentFile?.mkdirs()
+                    FileOutputStream(targetFile, false).use { fos ->
+                        fos.write(bytes)
+                        fos.flush()
+                    }
+                    return@runCatching
+                }
+
                 val resolver = appContext.contentResolver
 
                 // Prefer "wt" (write + truncate) to overwrite existing content cleanly.
@@ -60,6 +74,7 @@ class AndroidAutoBackupWriter(context: Context) : AutoBackupWriter {
 
     companion object {
         fun persistWritePermission(context: Context, uri: Uri) {
+            if (uri.scheme != "content") return
             runCatching {
                 context.contentResolver.takePersistableUriPermission(
                     uri,
@@ -69,6 +84,10 @@ class AndroidAutoBackupWriter(context: Context) : AutoBackupWriter {
         }
 
         fun resolveDisplayName(context: Context, uri: Uri): String {
+            if (uri.scheme == "file") {
+                val fileName = uri.path?.let { File(it).name }?.ifBlank { null }
+                if (fileName != null) return fileName
+            }
             runCatching {
                 context.contentResolver.query(
                     uri,

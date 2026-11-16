@@ -454,4 +454,24 @@ class PortfolioJsonAndRoomTest {
         assertEquals("{\"holdings\":[]}", vm.consumePendingExportJson())
         assertNull(vm.consumePendingExportJson())
     }
+
+    @Test
+    fun autoBackupWriter_fileUri_writesAndOverwritesCleanly() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val targetFile = java.io.File(context.cacheDir, "backup_test/auto_backup.json")
+        if (targetFile.exists()) targetFile.delete()
+
+        val uri = android.net.Uri.fromFile(targetFile)
+        val writer = AndroidAutoBackupWriter(context)
+
+        val first = writer.writeJsonToUri(uri.toString(), "{\"count\":2,\"holdings\":[1,2]}")
+        assertTrue(first.isSuccess)
+        assertEquals("{\"count\":2,\"holdings\":[1,2]}", targetFile.readText(Charsets.UTF_8))
+
+        // Overwrite with shorter content must truncate cleanly
+        val second = writer.writeJsonToUri(uri.toString(), "{\"count\":0}")
+        assertTrue(second.isSuccess)
+        assertEquals("{\"count\":0}", targetFile.readText(Charsets.UTF_8))
+        assertEquals("auto_backup.json", AndroidAutoBackupWriter.resolveDisplayName(context, uri))
+    }
 }

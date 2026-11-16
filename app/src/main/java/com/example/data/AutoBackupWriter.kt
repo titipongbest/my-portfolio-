@@ -75,11 +75,17 @@ class AndroidAutoBackupWriter(context: Context) : AutoBackupWriter {
     companion object {
         fun persistWritePermission(context: Context, uri: Uri) {
             if (uri.scheme != "content") return
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                )
+            val rwFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            val tookRw = runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, rwFlags)
+            }.isSuccess
+            if (!tookRw) {
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    )
+                }
             }
         }
 

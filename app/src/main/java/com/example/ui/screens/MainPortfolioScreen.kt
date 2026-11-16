@@ -2,11 +2,14 @@ package com.example.ui.screens
 
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.provider.DocumentsContract
 import android.provider.MediaStore
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -26,6 +29,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ListAlt
@@ -85,7 +89,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -121,6 +124,22 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private class GetContentChooserContract(
+    private val chooserTitle: String
+) : ActivityResultContract<String, Uri?>() {
+    override fun createIntent(context: Context, input: String): Intent {
+        val pickIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
+            type = input
+            addCategory(Intent.CATEGORY_OPENABLE)
+        }
+        return Intent.createChooser(pickIntent, chooserTitle)
+    }
+
+    override fun parseResult(resultCode: Int, intent: Intent?): Uri? {
+        return if (resultCode == android.app.Activity.RESULT_OK) intent?.data else null
+    }
+}
 
 private data class InAppFileManagerRequest(
     val mode: InAppFileManagerMode,
@@ -202,6 +221,20 @@ fun MainPortfolioScreen(
         onCategoryChanged(uiState.selectedCategory)
     }
 
+    var pendingTreeExportName by remember { mutableStateOf("portpulse_backup.json") }
+
+    fun createJsonFileInTree(treeUri: Uri, fileName: String): Result<Uri> = runCatching {
+        AndroidAutoBackupWriter.persistWritePermission(context, treeUri)
+        val docId = DocumentsContract.getTreeDocumentId(treeUri)
+        val parentDocUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+        DocumentsContract.createDocument(
+            context.contentResolver,
+            parentDocUri,
+            "application/json",
+            fileName
+        ) ?: error("ไม่สามารถสร้างไฟล์ในโฟลเดอร์ที่เลือกได้")
+    }
+
     fun handleExportUriSelected(uri: Uri?) {
         val jsonPayload = viewModel.consumePendingExportJson()
         if (uri != null && jsonPayload != null) {
@@ -247,6 +280,28 @@ fun MainPortfolioScreen(
         contract = ActivityResultContracts.CreateDocument("*/*")
     ) { uri -> handleExportUriSelected(uri) }
 
+    val exportTreeLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { treeUri ->
+        if (treeUri == null) {
+            viewModel.consumePendingExportJson()
+            return@rememberLauncherForActivityResult
+        }
+        scope.launch {
+            val created = withContext(Dispatchers.IO) {
+                createJsonFileInTree(treeUri, pendingTreeExportName)
+            }
+            created.onSuccess { docUri ->
+                handleExportUriSelected(docUri)
+            }.onFailure { err ->
+                viewModel.consumePendingExportJson()
+                viewModel.notifyMessage(
+                    "ส่งออกไฟล์ไม่สำเร็จ: ${err.localizedMessage ?: "เกิดข้อผิดพลาด"}"
+                )
+            }
+        }
+    }
+
     val autoBackupFileLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri -> handleAutoBackupUriSelected(uri) }
@@ -255,12 +310,30 @@ fun MainPortfolioScreen(
         contract = ActivityResultContracts.CreateDocument("*/*")
     ) { uri -> handleAutoBackupUriSelected(uri) }
 
+    val autoBackupTreeLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { treeUri ->
+        if (treeUri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val created = withContext(Dispatchers.IO) {
+                createJsonFileInTree(treeUri, "portpulse_auto_backup.json")
+            }
+            created.onSuccess { docUri ->
+                handleAutoBackupUriSelected(docUri)
+            }.onFailure { err ->
+                viewModel.notifyMessage(
+                    "ตั้งค่าตำแหน่งสำรองอัตโนมัติไม่สำเร็จ: ${err.localizedMessage ?: "เกิดข้อผิดพลาด"}"
+                )
+            }
+        }
+    }
+
     val importDocumentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri -> handleImportUriSelected(uri) }
 
     val importGetContentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = GetContentChooserContract("เลือกไฟล์สำรองจาก File Explorer")
     ) { uri -> handleImportUriSelected(uri) }
 
     fun triggerExportJson() {
@@ -274,6 +347,7 @@ fun MainPortfolioScreen(
                 viewModel.setPendingExportJson(json)
                 val dateStamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
                 val suggestedName = "portpulse_backup_$dateStamp.json"
+                pendingTreeExportName = suggestedName
                 suppressNextAutoLock = true
                 val launchedPrimary = try {
                     exportDocumentLauncher.launch(suggestedName)
@@ -282,20 +356,28 @@ fun MainPortfolioScreen(
                     false
                 }
                 if (!launchedPrimary) {
-                    val launchedFallback = try {
+                    val launchedAny = try {
                         exportAnyDocumentLauncher.launch(suggestedName)
                         true
                     } catch (_: Exception) {
                         false
                     }
-                    if (!launchedFallback) {
-                        suppressNextAutoLock = false
-                        viewModel.consumePendingExportJson()
-                        fileManagerRequest = InAppFileManagerRequest(
-                            mode = InAppFileManagerMode.EXPORT_JSON,
-                            suggestedFileName = suggestedName,
-                            exportJson = json
-                        )
+                    if (!launchedAny) {
+                        val launchedTree = try {
+                            exportTreeLauncher.launch(null)
+                            true
+                        } catch (_: Exception) {
+                            false
+                        }
+                        if (!launchedTree) {
+                            suppressNextAutoLock = false
+                            viewModel.consumePendingExportJson()
+                            fileManagerRequest = InAppFileManagerRequest(
+                                mode = InAppFileManagerMode.EXPORT_JSON,
+                                suggestedFileName = suggestedName,
+                                exportJson = json
+                            )
+                        }
                     }
                 }
             }.onFailure { err ->
@@ -307,7 +389,7 @@ fun MainPortfolioScreen(
     fun triggerImportJson() {
         suppressNextAutoLock = true
         val launchedPrimary = try {
-            importDocumentLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+            importDocumentLauncher.launch(arrayOf("*/*"))
             true
         } catch (_: Exception) {
             false
@@ -339,18 +421,26 @@ fun MainPortfolioScreen(
             false
         }
         if (!launchedPrimary) {
-            val launchedFallback = try {
+            val launchedAny = try {
                 autoBackupAnyFileLauncher.launch(fileName)
                 true
             } catch (_: Exception) {
                 false
             }
-            if (!launchedFallback) {
-                suppressNextAutoLock = false
-                fileManagerRequest = InAppFileManagerRequest(
-                    mode = InAppFileManagerMode.SELECT_AUTO_BACKUP,
-                    suggestedFileName = fileName
-                )
+            if (!launchedAny) {
+                val launchedTree = try {
+                    autoBackupTreeLauncher.launch(null)
+                    true
+                } catch (_: Exception) {
+                    false
+                }
+                if (!launchedTree) {
+                    suppressNextAutoLock = false
+                    fileManagerRequest = InAppFileManagerRequest(
+                        mode = InAppFileManagerMode.SELECT_AUTO_BACKUP,
+                        suggestedFileName = fileName
+                    )
+                }
             }
         }
     }
@@ -865,7 +955,7 @@ private fun TopCategoryDropdownBar(
     val headerFg = MaterialTheme.colorScheme.onPrimary
 
     Box(modifier = modifier.fillMaxWidth()) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
@@ -873,12 +963,40 @@ private fun TopCategoryDropdownBar(
                 .clickable { expanded = true }
                 .padding(horizontal = 14.dp, vertical = 12.dp)
                 .testTag("top_category_dropdown"),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "ชนิดสินทรัพย์หลัก • ครอบคลุมทุกเมนู",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = headerFg.copy(alpha = 0.9f),
+                    softWrap = true,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp)
+                )
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        text = "$activeCount รายการ",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = activeAccent,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
@@ -895,55 +1013,32 @@ private fun TopCategoryDropdownBar(
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = "ชนิดสินทรัพย์หลัก • ครอบคลุมทุกเมนู",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = headerFg.copy(alpha = 0.88f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = activeLabel,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
-                        color = headerFg,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text(
-                        text = "$activeCount รายการ",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                        color = activeAccent,
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
-                    )
-                }
+                Text(
+                    text = activeLabel,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                    color = headerFg,
+                    softWrap = true,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp)
+                )
                 Surface(
                     color = headerFg.copy(alpha = 0.16f),
                     shape = RoundedCornerShape(10.dp),
                     border = BorderStroke(1.dp, headerFg.copy(alpha = 0.45f))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = "เปลี่ยน",
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            color = headerFg
+                            color = headerFg,
+                            maxLines = 1,
+                            softWrap = false
                         )
+                        Spacer(modifier = Modifier.width(2.dp))
                         Icon(
                             imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                             contentDescription = "เปิดเมนูเลือกหมวดหมู่",
@@ -959,6 +1054,7 @@ private fun TopCategoryDropdownBar(
             expanded = expanded,
             onDismissRequest = { expanded = false },
             modifier = Modifier
+                .widthIn(min = 280.dp)
                 .fillMaxWidth(0.92f)
                 .background(MaterialTheme.colorScheme.surface)
         ) {
@@ -1006,7 +1102,11 @@ private fun CategoryDropdownRow(
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                     ),
-                    color = if (isSelected) itemAccent else MaterialTheme.colorScheme.onSurface
+                    color = if (isSelected) itemAccent else MaterialTheme.colorScheme.onSurface,
+                    softWrap = true,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp)
                 )
                 Surface(
                     color = if (isSelected) itemAccent else itemContainer,
@@ -1016,6 +1116,8 @@ private fun CategoryDropdownRow(
                         text = "$count",
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                         color = if (isSelected) Color.White else itemAccent,
+                        maxLines = 1,
+                        softWrap = false,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                     )
                 }
@@ -1061,6 +1163,10 @@ private suspend fun writeJsonToUriSafely(
     jsonPayload: String
 ): Result<Unit> = withContext(Dispatchers.IO) {
     try {
+        if (uri.scheme == "file") {
+            val path = uri.path ?: error("ไม่พบตำแหน่งไฟล์ที่เลือก")
+            return@withContext writeJsonToLocalFile(File(path), jsonPayload)
+        }
         val resolver = context.contentResolver
         val bytes = jsonPayload.toByteArray(Charsets.UTF_8)
         val wroteTruncated = try {
@@ -1068,16 +1174,27 @@ private suspend fun writeJsonToUriSafely(
                 stream.write(bytes)
                 stream.flush()
             } != null
-        } catch (_: UnsupportedOperationException) {
-            false
-        } catch (_: IllegalArgumentException) {
+        } catch (_: Exception) {
             false
         }
         if (!wroteTruncated) {
-            resolver.openOutputStream(uri)?.use { stream ->
-                stream.write(bytes)
-                stream.flush()
-            } ?: error("ไม่สามารถเปิดไฟล์เพื่อบันทึกได้")
+            val wroteWithPfd = try {
+                resolver.openFileDescriptor(uri, "rw")?.use { pfd ->
+                    FileOutputStream(pfd.fileDescriptor).use { fos ->
+                        fos.channel.truncate(0L)
+                        fos.write(bytes)
+                        fos.flush()
+                    }
+                } != null
+            } catch (_: Exception) {
+                false
+            }
+            if (!wroteWithPfd) {
+                resolver.openOutputStream(uri)?.use { stream ->
+                    stream.write(bytes)
+                    stream.flush()
+                } ?: error("ไม่สามารถเปิดไฟล์เพื่อบันทึกได้")
+            }
         }
         Result.success(Unit)
     } catch (e: CancellationException) {

@@ -294,7 +294,10 @@ fun BackupScreenDialog(
                                             modifier = Modifier.size(18.dp)
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text("เปลี่ยนตำแหน่ง", maxLines = 1)
+                                        Text(
+                                            text = "เปลี่ยนตำแหน่ง",
+                                            softWrap = true
+                                        )
                                     }
 
                                     Button(
@@ -311,12 +314,15 @@ fun BackupScreenDialog(
                                             modifier = Modifier.size(18.dp)
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text("สำรองทันที", maxLines = 1)
+                                        Text(
+                                            text = "สำรองทันที",
+                                            softWrap = true
+                                        )
                                     }
                                 }
                             } else {
                                 Text(
-                                    text = "ยังไม่ได้กำหนดไฟล์สำหรับสำรองอัตโนมัติ กดปุ่มด้านล่างเพื่อเลือกโฟลเดอร์และชื่อไฟล์ที่ต้องการให้ระบบบันทึกทับเป็นประจำ",
+                                    text = "ยังไม่ได้กำหนดไฟล์สำหรับสำรองอัตโนมัติ กดปุ่มด้านล่างเพื่อเปิด File Explorer ของ Android เลือกโฟลเดอร์และไฟล์ปลายทาง",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -336,7 +342,7 @@ fun BackupScreenDialog(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "เลือกตำแหน่งบันทึกไฟล์อัตโนมัติ",
+                                        text = "เลือกตำแหน่งผ่าน File Explorer",
                                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
                                     )
                                 }
@@ -350,8 +356,8 @@ fun BackupScreenDialog(
                     BackupActionCard(
                         icon = Icons.Default.Download,
                         title = "ส่งออกข้อมูลรวมไฟล์เดียว (Export JSON)",
-                        subtitle = "รวมสินทรัพย์ทุกหมวดหมู่ (หุ้นไทย หุ้นต่างประเทศ กองทุน ทองคำ คริปโต) และกลุ่มอุตสาหกรรมไว้ในไฟล์ .json เดียว",
-                        buttonLabel = "ส่งออกไฟล์ JSON",
+                        subtitle = "เลือกตำแหน่งบันทึกผ่าน File Explorer ของ Android รวมสินทรัพย์ทุกหมวดหมู่และกลุ่มอุตสาหกรรมไว้ในไฟล์ .json เดียว",
+                        buttonLabel = "ส่งออกไฟล์ JSON (File Explorer)",
                         buttonTag = "backup_screen_export_button",
                         isPrimaryButton = false,
                         onClick = onExportJsonClick,
@@ -384,8 +390,8 @@ fun BackupScreenDialog(
                     BackupActionCard(
                         icon = Icons.Default.UploadFile,
                         title = "นำเข้าข้อมูลจากไฟล์เดียว (Import JSON)",
-                        subtitle = "นำเข้าสินทรัพย์ทุกหมวดหมู่และกลุ่มอุตสาหกรรมจากไฟล์สำรอง .json โดยเลือกเพิ่มต่อจากเดิมหรือแทนที่ทั้งหมด",
-                        buttonLabel = "นำเข้าไฟล์ JSON",
+                        subtitle = "เปิด File Explorer ของ Android เพื่อเลือกไฟล์สำรอง .json และนำเข้าสินทรัพย์ทุกหมวดหมู่",
+                        buttonLabel = "นำเข้าไฟล์ JSON (File Explorer)",
                         buttonTag = "backup_screen_import_button",
                         isPrimaryButton = false,
                         onClick = onImportJsonClick

@@ -8,8 +8,8 @@ import android.provider.MediaStore
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,6 +50,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -79,7 +80,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -383,215 +383,227 @@ fun MainPortfolioScreen(
             containerColor = MaterialTheme.colorScheme.background,
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             topBar = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.background)
-                ) {
-                    TopAppBar(
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.background
-                        ),
-                        title = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(MaterialTheme.colorScheme.primary),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.PieChart,
-                                        contentDescription = "PortPulse",
-                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text(
-                                        text = "PortPulse",
-                                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                        color = MaterialTheme.colorScheme.onBackground
-                                    )
-                                    Text(
-                                        text = selectedTab.labelTh,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        },
-                        actions = {
-                            IconButton(
-                                onClick = { showSecurityDialog = true },
-                                modifier = Modifier.testTag("security_lock_button")
+                TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
+                    ),
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.primary),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = if (uiState.securityConfig.isPinEnabled) {
-                                        Icons.Default.Lock
-                                    } else {
-                                        Icons.Default.LockOpen
-                                    },
-                                    contentDescription = "ล็อกแอปด้วย PIN และลายนิ้วมือ",
-                                    tint = LocalPortfolioColors.current.accentHighlight
+                                    imageVector = Icons.Default.PieChart,
+                                    contentDescription = "PortPulse",
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
-                            IconButton(
-                                onClick = { showBackupScreen = true },
-                                modifier = Modifier.testTag("backup_screen_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Backup,
-                                    contentDescription = "สำรองข้อมูล",
-                                    tint = LocalPortfolioColors.current.accentHighlight
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "PortPulse",
+                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Text(
+                                    text = selectedTab.labelTh,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
-                    )
-
-                    // Category Dropdown pinned right at the top (specific AssetCategory only, no "all")
-                    TopCategoryDropdownBar(
-                        selectedCategory = uiState.selectedCategory,
-                        allHoldings = uiState.allHoldings,
-                        onSelectCategory = viewModel::selectCategory,
-                        modifier = Modifier
-                            .padding(horizontal = 16.dp)
-                            .padding(bottom = 8.dp)
-                    )
-                }
-            },
-            bottomBar = {
-                if (!useRail) {
-                    NavigationBar(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    ) {
-                        MainTab.entries.forEach { tab ->
-                            NavigationBarItem(
-                                selected = selectedTab == tab,
-                                onClick = { selectedTab = tab },
-                                icon = {
-                                    Icon(
-                                        imageVector = tab.icon,
-                                        contentDescription = tab.labelTh
-                                    )
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = { showSecurityDialog = true },
+                            modifier = Modifier.testTag("security_lock_button")
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.securityConfig.isPinEnabled) {
+                                    Icons.Default.Lock
+                                } else {
+                                    Icons.Default.LockOpen
                                 },
-                                label = { Text(tab.labelTh) },
-                                colors = NavigationBarItemDefaults.colors(
-                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    selectedTextColor = MaterialTheme.colorScheme.onSurface
-                                ),
-                                modifier = Modifier.testTag("nav_tab_${tab.name}")
+                                contentDescription = "ล็อกแอปด้วย PIN และลายนิ้วมือ",
+                                tint = LocalPortfolioColors.current.accentHighlight
+                            )
+                        }
+                        IconButton(
+                            onClick = { showBackupScreen = true },
+                            modifier = Modifier.testTag("backup_screen_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Backup,
+                                contentDescription = "สำรองข้อมูล",
+                                tint = LocalPortfolioColors.current.accentHighlight
                             )
                         }
                     }
-                }
-            },
-            floatingActionButton = {
-                FloatingActionButton(
-                    onClick = {
-                        editingHolding = null
-                        showAddEditSheet = true
-                    },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.testTag("add_holding_fab")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "เพิ่มสินทรัพย์"
-                    )
-                }
+                )
             }
         ) { innerPadding ->
-            Row(
+            val frameAccent = MaterialTheme.colorScheme.primary
+            Surface(
+                color = MaterialTheme.colorScheme.background,
+                shape = RoundedCornerShape(22.dp),
+                shadowElevation = 4.dp,
+                border = BorderStroke(2.dp, frameAccent),
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
+                    .padding(horizontal = 10.dp)
+                    .padding(bottom = 8.dp)
             ) {
-                if (useRail) {
-                    NavigationRail(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        modifier = Modifier.fillMaxHeight()
-                    ) {
-                        MainTab.entries.forEach { tab ->
-                            NavigationRailItem(
-                                selected = selectedTab == tab,
-                                onClick = { selectedTab = tab },
-                                icon = {
-                                    Icon(
-                                        imageVector = tab.icon,
-                                        contentDescription = tab.labelTh
-                                    )
-                                },
-                                label = { Text(tab.labelTh) },
-                                colors = NavigationRailItemDefaults.colors(
-                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    selectedTextColor = MaterialTheme.colorScheme.onSurface
-                                ),
-                                modifier = Modifier.testTag("rail_tab_${tab.name}")
-                            )
-                        }
-                    }
-                }
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Master Category Selector pinned as the distinct framing header covering all menus below
+                    TopCategoryDropdownBar(
+                        selectedCategory = uiState.selectedCategory,
+                        allHoldings = uiState.allHoldings,
+                        onSelectCategory = viewModel::selectCategory
+                    )
 
-                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                    when {
-                        uiState.isLoading -> {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                    ) {
+                        if (useRail) {
+                            NavigationRail(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                modifier = Modifier.fillMaxHeight()
                             ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    CircularProgressIndicator()
-                                    Spacer(modifier = Modifier.size(12.dp))
-                                    Text(
-                                        text = "กำลังโหลดข้อมูลพอร์ต...",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                MainTab.entries.forEach { tab ->
+                                    NavigationRailItem(
+                                        selected = selectedTab == tab,
+                                        onClick = { selectedTab = tab },
+                                        icon = {
+                                            Icon(
+                                                imageVector = tab.icon,
+                                                contentDescription = tab.labelTh
+                                            )
+                                        },
+                                        label = { Text(tab.labelTh) },
+                                        colors = NavigationRailItemDefaults.colors(
+                                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            selectedTextColor = MaterialTheme.colorScheme.onSurface
+                                        ),
+                                        modifier = Modifier.testTag("rail_tab_${tab.name}")
                                     )
                                 }
                             }
                         }
-                        uiState.errorMessage != null -> {
-                            Box(
+
+                        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                            when {
+                                uiState.isLoading -> {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            CircularProgressIndicator()
+                                            Spacer(modifier = Modifier.size(12.dp))
+                                            Text(
+                                                text = "กำลังโหลดข้อมูลพอร์ต...",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                                uiState.errorMessage != null -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(24.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = uiState.errorMessage ?: "เกิดข้อผิดพลาด",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
+                                else -> {
+                                    when (selectedTab) {
+                                        MainTab.DASHBOARD -> DashboardTab(
+                                            uiState = uiState,
+                                            onRefreshPrices = viewModel::refreshPrices,
+                                            onAddHoldingClick = {
+                                                editingHolding = null
+                                                showAddEditSheet = true
+                                            }
+                                        )
+                                        MainTab.ANALYTICS -> AnalyticsTab(
+                                            uiState = uiState,
+                                            onManageSectorsClick = { showManageSectorsDialog = true }
+                                        )
+                                        MainTab.HOLDINGS -> HoldingsTab(
+                                            uiState = uiState,
+                                            onEditHolding = { holding ->
+                                                editingHolding = holding
+                                                showAddEditSheet = true
+                                            },
+                                            onDeleteHolding = viewModel::deleteHolding,
+                                            onViewDividends = viewModel::openDividendDialog
+                                        )
+                                    }
+                                }
+                            }
+
+                            FloatingActionButton(
+                                onClick = {
+                                    editingHolding = null
+                                    showAddEditSheet = true
+                                },
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(24.dp),
-                                contentAlignment = Alignment.Center
+                                    .align(Alignment.BottomEnd)
+                                    .padding(16.dp)
+                                    .testTag("add_holding_fab")
                             ) {
-                                Text(
-                                    text = uiState.errorMessage ?: "เกิดข้อผิดพลาด",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.error
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "เพิ่มสินทรัพย์"
                                 )
                             }
                         }
-                        else -> {
-                            when (selectedTab) {
-                                MainTab.DASHBOARD -> DashboardTab(
-                                    uiState = uiState,
-                                    onRefreshPrices = viewModel::refreshPrices,
-                                    onAddHoldingClick = {
-                                        editingHolding = null
-                                        showAddEditSheet = true
-                                    }
-                                )
-                                MainTab.ANALYTICS -> AnalyticsTab(
-                                    uiState = uiState,
-                                    onManageSectorsClick = { showManageSectorsDialog = true }
-                                )
-                                MainTab.HOLDINGS -> HoldingsTab(
-                                    uiState = uiState,
-                                    onEditHolding = { holding ->
-                                        editingHolding = holding
-                                        showAddEditSheet = true
+                    }
+
+                    if (!useRail) {
+                        HorizontalDivider(
+                            thickness = 1.dp,
+                            color = frameAccent.copy(alpha = 0.25f)
+                        )
+                        NavigationBar(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            windowInsets = WindowInsets(0, 0, 0, 0)
+                        ) {
+                            MainTab.entries.forEach { tab ->
+                                NavigationBarItem(
+                                    selected = selectedTab == tab,
+                                    onClick = { selectedTab = tab },
+                                    icon = {
+                                        Icon(
+                                            imageVector = tab.icon,
+                                            contentDescription = tab.labelTh
+                                        )
                                     },
-                                    onDeleteHolding = viewModel::deleteHolding,
-                                    onViewDividends = viewModel::openDividendDialog
+                                    label = { Text(tab.labelTh) },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        selectedTextColor = MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    modifier = Modifier.testTag("nav_tab_${tab.name}")
                                 )
                             }
                         }
@@ -849,18 +861,17 @@ private fun TopCategoryDropdownBar(
     val activeLabel = selectedCategory.labelTh
     val activeIcon = categoryMenuIcon(selectedCategory)
     val activeAccent = categoryAccentColor(selectedCategory)
-    val activeContainer = categoryContainerColor(selectedCategory)
+    val headerBg = MaterialTheme.colorScheme.primary
+    val headerFg = MaterialTheme.colorScheme.onPrimary
 
     Box(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .shadow(2.dp, RoundedCornerShape(16.dp))
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .border(1.2.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .background(headerBg)
                 .clickable { expanded = true }
-                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .padding(horizontal = 14.dp, vertical = 12.dp)
                 .testTag("top_category_dropdown"),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -871,53 +882,76 @@ private fun TopCategoryDropdownBar(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(34.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(activeContainer),
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surface),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = activeIcon,
                         contentDescription = activeLabel,
                         tint = activeAccent,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        text = "หมวดหมู่สินทรัพย์",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "ชนิดสินทรัพย์หลัก • ครอบคลุมทุกเมนู",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = headerFg.copy(alpha = 0.88f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = activeLabel,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                        color = headerFg,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 Surface(
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text(
                         text = "$activeCount รายการ",
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        color = activeAccent,
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(6.dp))
-                Icon(
-                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = "เปิดเมนูเลือกหมวดหมู่",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
+                Surface(
+                    color = headerFg.copy(alpha = 0.16f),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, headerFg.copy(alpha = 0.45f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "เปลี่ยน",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = headerFg
+                        )
+                        Icon(
+                            imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = "เปิดเมนูเลือกหมวดหมู่",
+                            tint = headerFg,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             }
         }
 

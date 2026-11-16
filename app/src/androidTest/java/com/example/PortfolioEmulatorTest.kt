@@ -50,8 +50,8 @@ class PortfolioEmulatorTest {
             .edit()
             .clear()
             .commit()
-        runBlocking {
-            PortfolioDatabase.getInstance(appContext).holdingDao().deleteAll()
+        runBlocking<Unit> {
+            PortfolioDatabase.getInstance(appContext).holdingDao().deleteAllHoldings()
         }
         Intents.init()
         scenario = ActivityScenario.launch(MainActivity::class.java)
@@ -223,6 +223,14 @@ class PortfolioEmulatorTest {
                 true
             }.getOrDefault(false)
         }
+
+        Intents.intended(
+            allOf(
+                IntentMatchers.hasAction(Intent.ACTION_CREATE_DOCUMENT),
+                IntentMatchers.hasType("application/json")
+            ),
+            Intents.times(2)
+        )
     }
 
     private fun assertTextNotTruncated(nodeInteraction: SemanticsNodeInteraction) {

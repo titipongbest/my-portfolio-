@@ -284,7 +284,7 @@ class PortfolioEmulatorTest {
                 "Text '${node.config}' was ellipsized on line $line",
                 layout.isLineEllipsized(line)
             )
-            val lineWidthPx = layout.getLineWidth(line)
+            val lineWidthPx = layout.getLineRight(line) - layout.getLineLeft(line)
             assertTrue(
                 "Text '${node.config}' line $line overflowed container width (${lineWidthPx}px > sizeW=${layout.size.width}px)",
                 lineWidthPx <= layout.size.width.toFloat() + 2.0f

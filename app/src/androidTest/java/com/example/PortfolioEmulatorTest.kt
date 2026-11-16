@@ -15,6 +15,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -164,7 +165,11 @@ class PortfolioEmulatorTest {
         composeRule.waitForIdle()
 
         // 1) Import via Android File Explorer
-        composeRule.onNodeWithTag("backup_screen_import_button").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("backup_screen_import_button")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitForIdle()
         Intents.intended(IntentMatchers.hasAction(Intent.ACTION_OPEN_DOCUMENT))
         composeRule.waitUntil(timeoutMillis = 5_000) {
             runCatching {
@@ -192,7 +197,10 @@ class PortfolioEmulatorTest {
                 Intent().setData(Uri.fromFile(exportFile))
             )
         )
-        composeRule.onNodeWithTag("backup_screen_export_button").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("backup_screen_export_button")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
         waitUntilCondition(5_000) { exportFile.exists() && exportFile.length() > 10 }
         val exportedText = exportFile.readText(Charsets.UTF_8)
         assertTrue(exportedText.contains("\"PTT\""))
@@ -210,7 +218,10 @@ class PortfolioEmulatorTest {
                 Intent().setData(Uri.fromFile(autoFile))
             )
         )
-        composeRule.onNodeWithTag("select_auto_backup_location_button").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("select_auto_backup_location_button")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
         waitUntilCondition(5_000) { autoFile.exists() && autoFile.length() > 10 }
         val autoText = autoFile.readText(Charsets.UTF_8)
         assertTrue(autoText.contains("\"PTT\""))
@@ -219,7 +230,9 @@ class PortfolioEmulatorTest {
         // Verify Backup Screen updates to show configured Auto Backup actions
         composeRule.waitUntil(timeoutMillis = 5_000) {
             runCatching {
-                composeRule.onNodeWithTag("run_auto_backup_now_button").assertIsDisplayed()
+                composeRule.onNodeWithTag("run_auto_backup_now_button")
+                    .performScrollTo()
+                    .assertIsDisplayed()
                 true
             }.getOrDefault(false)
         }

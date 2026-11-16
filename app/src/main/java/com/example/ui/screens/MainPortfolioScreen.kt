@@ -987,8 +987,6 @@ private fun TopCategoryDropdownBar(
                         text = "$activeCount รายการ",
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                         color = activeAccent,
-                        maxLines = 1,
-                        softWrap = false,
                         modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
                     )
                 }
@@ -1034,9 +1032,7 @@ private fun TopCategoryDropdownBar(
                         Text(
                             text = "เปลี่ยน",
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            color = headerFg,
-                            maxLines = 1,
-                            softWrap = false
+                            color = headerFg
                         )
                         Spacer(modifier = Modifier.width(2.dp))
                         Icon(
@@ -1116,8 +1112,6 @@ private fun CategoryDropdownRow(
                         text = "$count",
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                         color = if (isSelected) Color.White else itemAccent,
-                        maxLines = 1,
-                        softWrap = false,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                     )
                 }

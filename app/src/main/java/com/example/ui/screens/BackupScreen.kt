@@ -100,8 +100,10 @@ fun BackupScreenDialog(
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Main)
-                        event.changes.forEach { it.consume() }
+                        // Keep a passive pointer node on the full-screen surface so taps on empty space
+                        // do not fall through to MainPortfolioScreen, without consuming Move/Up events
+                        // that child buttons need during real finger taps.
+                        awaitPointerEvent(PointerEventPass.Final)
                     }
                 }
             },

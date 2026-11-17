@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
@@ -16,6 +17,7 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -173,12 +175,12 @@ class PortfolioEmulatorTest {
         composeRule.onNodeWithTag("backup_screen_button").assertIsDisplayed().performClick()
         composeRule.waitForIdle()
 
-        // 1) Import via Android File Explorer
+        // 1) Import via Android File Explorer (with realistic finger jitter during tap)
         composeRule.onNodeWithTag("backup_screen_import_button")
             .performScrollTo()
             .assertIsDisplayed()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("backup_screen_import_button").performClick()
+        performFingerTap(composeRule.onNodeWithTag("backup_screen_import_button"))
         composeRule.waitForIdle()
         waitUntilCondition(5_000, failureDetails = {
             val recorded = Intents.getIntents().joinToString(" | ") { "${it.action}:${it.type}:${it.component}" }
@@ -209,7 +211,7 @@ class PortfolioEmulatorTest {
             }.getOrDefault(false)
         }
 
-        // 2) Export via Android File Explorer
+        // 2) Export via Android File Explorer (with realistic finger jitter during tap)
         Intents.intending(
             allOf(
                 IntentMatchers.hasAction(Intent.ACTION_CREATE_DOCUMENT),
@@ -225,13 +227,13 @@ class PortfolioEmulatorTest {
             .performScrollTo()
             .assertIsDisplayed()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("backup_screen_export_button").performClick()
+        performFingerTap(composeRule.onNodeWithTag("backup_screen_export_button"))
         waitUntilCondition(5_000) { exportFile.exists() && exportFile.length() > 10 }
         val exportedText = exportFile.readText(Charsets.UTF_8)
         assertTrue(exportedText.contains("\"PTT\""))
         assertTrue(exportedText.contains("\"BTC\""))
 
-        // 3) Auto-Backup destination selection via Android File Explorer
+        // 3) Auto-Backup destination selection via Android File Explorer (with realistic finger jitter)
         Intents.intending(
             allOf(
                 IntentMatchers.hasAction(Intent.ACTION_CREATE_DOCUMENT),
@@ -247,7 +249,7 @@ class PortfolioEmulatorTest {
             .performScrollTo()
             .assertIsDisplayed()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("select_auto_backup_location_button").performClick()
+        performFingerTap(composeRule.onNodeWithTag("select_auto_backup_location_button"))
         waitUntilCondition(5_000) { autoFile.exists() && autoFile.length() > 10 }
         val autoText = autoFile.readText(Charsets.UTF_8)
         assertTrue(autoText.contains("\"PTT\""))
@@ -270,6 +272,23 @@ class PortfolioEmulatorTest {
             ),
             Intents.times(2)
         )
+
+        // 4) Back button also responds reliably to a real finger tap
+        performFingerTap(composeRule.onNodeWithTag("backup_back_button"))
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                composeRule.onNodeWithTag("top_category_dropdown").assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+        }
+    }
+
+    private fun performFingerTap(nodeInteraction: SemanticsNodeInteraction) {
+        nodeInteraction.performTouchInput {
+            down(center)
+            moveBy(Offset(2f, 2f))
+            up()
+        }
     }
 
     private fun assertTextNotTruncated(nodeInteraction: SemanticsNodeInteraction) {

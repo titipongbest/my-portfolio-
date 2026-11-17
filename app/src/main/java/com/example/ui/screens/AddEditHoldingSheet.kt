@@ -80,8 +80,10 @@ import com.example.ui.theme.NumericStyleMedium
 import com.example.ui.theme.categoryAccentColor
 import com.example.ui.theme.categoryContainerColor
 import com.example.ui.theme.categoryOnContainerColor
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -107,7 +109,7 @@ fun AddEditHoldingSheet(
     ) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val scope = rememberCoroutineScope()
+    val scope = rememberCoroutineScope { Dispatchers.Main.immediate }
     val portfolioColors = LocalPortfolioColors.current
 
     val selectedCategory = existingHolding?.assetCategory ?: activeCategory
@@ -178,12 +180,14 @@ fun AddEditHoldingSheet(
             (selectedCategory.isStock || selectedCategory == AssetCategory.MUTUAL_FUND)
         ) {
             delay(280L)
-            isSearchingOnline = true
-            val remoteAndLocal = runCatching { onSearchAssets(q, selectedCategory) }.getOrNull()
-            if (remoteAndLocal != null) {
-                filteredAssets = remoteAndLocal
+            withContext(Dispatchers.Main.immediate) {
+                isSearchingOnline = true
+                val remoteAndLocal = runCatching { onSearchAssets(q, selectedCategory) }.getOrNull()
+                if (remoteAndLocal != null) {
+                    filteredAssets = remoteAndLocal
+                }
+                isSearchingOnline = false
             }
-            isSearchingOnline = false
         } else {
             isSearchingOnline = false
         }

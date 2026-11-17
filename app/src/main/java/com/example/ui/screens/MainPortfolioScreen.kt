@@ -163,7 +163,7 @@ fun MainPortfolioScreen(
     onCategoryChanged: (AssetCategory) -> Unit
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val scope = rememberCoroutineScope { Dispatchers.Main.immediate }
 
     val viewModel: PortfolioViewModel = viewModel(
         factory = viewModelFactory {

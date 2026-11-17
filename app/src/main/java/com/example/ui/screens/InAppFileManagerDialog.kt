@@ -149,13 +149,15 @@ fun InAppFileManagerDialog(
     var folderError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(selectedTab, currentDir, mode, refreshTrigger) {
-        entries = withContext(Dispatchers.IO) {
-            loadDirectoryEntries(
-                context = context,
-                tab = selectedTab,
-                appDir = currentDir,
-                includeMediaStoreOnlyOnQ = true
-            )
+        withContext(Dispatchers.Main.immediate) {
+            entries = withContext(Dispatchers.IO) {
+                loadDirectoryEntries(
+                    context = context,
+                    tab = selectedTab,
+                    appDir = currentDir,
+                    includeMediaStoreOnlyOnQ = true
+                )
+            }
         }
     }
 

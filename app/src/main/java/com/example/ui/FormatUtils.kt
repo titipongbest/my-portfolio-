@@ -22,6 +22,22 @@ object FormatUtils {
         return "${sign}฿${thbDecimalFormat.format(abs(amount))}"
     }
 
+    fun formatNumber(amount: Double, decimals: Int = 2, showSign: Boolean = false): String {
+        val sign = when {
+            !showSign -> if (amount < 0) "-" else ""
+            amount > 0.004 -> "+"
+            amount < -0.004 -> "-"
+            else -> ""
+        }
+        val formatted = if (decimals == 2) {
+            thbDecimalFormat.format(abs(amount))
+        } else {
+            val pattern = if (decimals <= 0) "#,##0" else "#,##0." + "0".repeat(decimals)
+            DecimalFormat(pattern).format(abs(amount))
+        }
+        return "$sign$formatted"
+    }
+
     fun formatThbCompact(amount: Double): String {
         val sign = if (amount < 0) "-" else ""
         val a = abs(amount)

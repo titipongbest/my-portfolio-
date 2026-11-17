@@ -568,6 +568,49 @@ fun MainPortfolioScreen(
                         }
                     }
                 )
+            },
+            bottomBar = {
+                if (!useRail) {
+                    Column(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
+                        HorizontalDivider(
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        NavigationBar(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            tonalElevation = 0.dp
+                        ) {
+                            MainTab.entries.forEach { tab ->
+                                NavigationBarItem(
+                                    selected = selectedTab == tab,
+                                    onClick = { selectedTab = tab },
+                                    icon = {
+                                        Icon(
+                                            imageVector = tab.icon,
+                                            contentDescription = tab.labelTh
+                                        )
+                                    },
+                                    label = {
+                                        Text(
+                                            text = tab.labelTh,
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = if (selectedTab == tab) FontWeight.Bold else FontWeight.Medium
+                                            )
+                                        )
+                                    },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                                        unselectedIconColor = portfolioColors.mutedSlate,
+                                        unselectedTextColor = portfolioColors.mutedSlate
+                                    ),
+                                    modifier = Modifier.testTag("nav_tab_${tab.name}")
+                                )
+                            }
+                        }
+                    }
+                }
             }
         ) { innerPadding ->
             Column(
@@ -695,47 +738,6 @@ fun MainPortfolioScreen(
                         }
                     }
                 }
-
-                if (!useRail) {
-                    HorizontalDivider(
-                        thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                    NavigationBar(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 0.dp,
-                        windowInsets = WindowInsets(0, 0, 0, 0)
-                    ) {
-                        MainTab.entries.forEach { tab ->
-                            NavigationBarItem(
-                                selected = selectedTab == tab,
-                                onClick = { selectedTab = tab },
-                                icon = {
-                                    Icon(
-                                        imageVector = tab.icon,
-                                        contentDescription = tab.labelTh
-                                    )
-                                },
-                                label = {
-                                    Text(
-                                        text = tab.labelTh,
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontWeight = if (selectedTab == tab) FontWeight.Bold else FontWeight.Medium
-                                        )
-                                    )
-                                },
-                                colors = NavigationBarItemDefaults.colors(
-                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                                    unselectedIconColor = portfolioColors.mutedSlate,
-                                    unselectedTextColor = portfolioColors.mutedSlate
-                                ),
-                                modifier = Modifier.testTag("nav_tab_${tab.name}")
-                            )
-                        }
-                    }
-                }
             }
         }
     }
@@ -805,7 +807,10 @@ fun MainPortfolioScreen(
             onRunAutoBackupNow = { viewModel.runAutoBackupNow(showToast = true) },
             onExportJsonClick = { triggerExportJson() },
             onImportJsonClick = { triggerImportJson() },
-            onDismiss = { showBackupScreen = false }
+            onDismiss = {
+                viewModel.clearActionMessage()
+                showBackupScreen = false
+            }
         )
     }
 

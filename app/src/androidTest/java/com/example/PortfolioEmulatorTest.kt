@@ -290,17 +290,34 @@ class PortfolioEmulatorTest {
 
         // Switch to Analytics tab and verify sector card renders cleanly
         composeRule.onNodeWithTag("nav_tab_ANALYTICS").performClick()
-        composeRule.waitForIdle()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                composeRule.onNodeWithTag("sector_card_ENERGY").fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+        }
         composeRule.onNodeWithTag("sector_card_ENERGY").performScrollTo().assertIsDisplayed()
 
         // Switch to Holdings tab, verify holding card + expandable breakdown
         composeRule.onNodeWithTag("nav_tab_HOLDINGS").performClick()
-        composeRule.waitForIdle()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                composeRule.onNodeWithTag("holding_card_PTT").fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+        }
         composeRule.onNodeWithTag("holding_card_PTT").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("holding_pnl_bar_PTT").assertIsDisplayed()
         composeRule.onNodeWithTag("holding_card_PTT").performClick()
-        composeRule.waitForIdle()
-        composeRule.onNode(hasText("มูลค่าทุนรวม"), useUnmergedTree = true).assertIsDisplayed()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                composeRule.onNode(hasText("มูลค่าทุนรวม"), useUnmergedTree = true).fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+        }
+        composeRule.onNode(hasText("มูลค่าทุนรวม"), useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 
     private fun performFingerTap(nodeInteraction: SemanticsNodeInteraction) {

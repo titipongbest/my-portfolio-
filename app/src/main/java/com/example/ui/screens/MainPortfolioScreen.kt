@@ -536,7 +536,7 @@ fun MainPortfolioScreen(
                                 Text(
                                     text = "${selectedTab.labelTh} • ${uiState.selectedCategory.shortLabelTh}",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFFCBD5E1)
+                                    color = Color.White.copy(alpha = 0.80f)
                                 )
                             }
                         }
@@ -1027,7 +1027,7 @@ private fun TopCategoryDropdownBar(
                     Text(
                         text = "ชนิดสินทรัพย์หลัก • ครอบคลุมทุกเมนู",
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = Color(0xFFE2E8F0),
+                        color = Color.White.copy(alpha = 0.88f),
                         softWrap = true,
                         modifier = Modifier
                             .weight(1f)
@@ -1154,7 +1154,7 @@ private fun CategoryDropdownRow(
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                     ),
-                    color = if (isSelected) portfolioColors.navyHeroDeep else MaterialTheme.colorScheme.onSurface,
+                    color = if (isSelected) itemAccent else MaterialTheme.colorScheme.onSurface,
                     softWrap = true,
                     modifier = Modifier
                         .weight(1f)
@@ -1194,7 +1194,7 @@ private fun CategoryDropdownRow(
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = "กำลังเลือก",
-                    tint = portfolioColors.navyHeroDeep
+                    tint = itemAccent
                 )
             }
         } else null,

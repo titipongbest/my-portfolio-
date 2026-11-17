@@ -296,7 +296,7 @@ private fun NavyOverlapHeroSection(
                 Text(
                     text = "${FormatUtils.formatUpdatedTime(lastUpdatedMillis)} • 1 USD = ฿${String.format(java.util.Locale.US, "%.2f", usdToThbRate)}${if (isLiveFxRate) "" else "*"}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFFCBD5E1),
+                    color = Color.White.copy(alpha = 0.82f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
@@ -347,7 +347,7 @@ private fun NavyOverlapHeroSection(
             Text(
                 text = "มูลค่าพอร์ต$categoryShortLabel",
                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                color = Color(0xFFCBD5E1)
+                color = Color.White.copy(alpha = 0.84f)
             )
             Spacer(modifier = Modifier.height(2.dp))
             Row(
@@ -366,7 +366,7 @@ private fun NavyOverlapHeroSection(
                 Text(
                     text = "บาท",
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = Color(0xFFE2E8F0),
+                    color = Color.White.copy(alpha = 0.90f),
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
             }

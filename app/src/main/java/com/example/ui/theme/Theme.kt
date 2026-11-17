@@ -88,26 +88,41 @@ fun PortPulseTheme(
     selectedCategory: AssetCategory = AssetCategory.THAI_STOCK,
     content: @Composable () -> Unit
 ) {
+    val targetHeroDeep = categoryHeroDeepColor(selectedCategory)
+    val targetHeroLight = categoryHeroLightColor(selectedCategory)
+    val targetSecondary = categorySecondaryColor(selectedCategory)
     val targetCatAccent = categoryAccentColor(selectedCategory)
     val targetCatContainer = categoryContainerColor(selectedCategory)
     val targetCatOnContainer = categoryOnContainerColor(selectedCategory)
 
     val animSpec = tween<Color>(durationMillis = 260)
+    val animatedHeroDeep by animateColorAsState(targetHeroDeep, animSpec, label = "heroDeep")
+    val animatedHeroLight by animateColorAsState(targetHeroLight, animSpec, label = "heroLight")
+    val animatedSecondary by animateColorAsState(targetSecondary, animSpec, label = "secondary")
     val animatedCatAccent by animateColorAsState(targetCatAccent, animSpec, label = "catAccent")
     val animatedCatContainer by animateColorAsState(targetCatContainer, animSpec, label = "catContainer")
     val animatedCatOnContainer by animateColorAsState(targetCatOnContainer, animSpec, label = "catOnContainer")
+
+    val colorScheme = InstitutionalWealthScheme.copy(
+        primary = animatedCatAccent,
+        secondary = animatedSecondary,
+        primaryContainer = animatedCatContainer,
+        onPrimaryContainer = animatedCatOnContainer,
+        secondaryContainer = animatedCatContainer,
+        onSecondaryContainer = animatedCatOnContainer
+    )
 
     val semanticColors = PortfolioSemanticColors(
         profit = ProfitGreenLight,
         profitContainer = ProfitGreenContainerLight,
         loss = LossRedLight,
         lossContainer = LossRedContainerLight,
-        accentHighlight = NavyPrimary,
+        accentHighlight = animatedCatAccent,
         costBoxBg = CostBoxBg,
         costBoxBorder = CostBoxBorder,
         costBoxLabel = CostBoxLabelColor,
-        navyHeroDeep = NavyHeaderDeep,
-        navyHeroLight = NavyPrimary,
+        navyHeroDeep = animatedHeroDeep,
+        navyHeroLight = animatedHeroLight,
         mutedSlate = WealthSlateMuted,
         categoryAccent = animatedCatAccent,
         categoryContainer = animatedCatContainer,
@@ -116,7 +131,7 @@ fun PortPulseTheme(
 
     CompositionLocalProvider(LocalPortfolioColors provides semanticColors) {
         MaterialTheme(
-            colorScheme = InstitutionalWealthScheme,
+            colorScheme = colorScheme,
             typography = AppTypography,
             shapes = AppShapes,
             content = content

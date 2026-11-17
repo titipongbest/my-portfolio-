@@ -306,10 +306,24 @@ class PortfolioAnalyzerTest {
             val onContainer = com.example.ui.theme.categoryOnContainerColor(cat)
             val container = com.example.ui.theme.categoryContainerColor(cat)
             val accent = com.example.ui.theme.categoryAccentColor(cat)
+            val heroDeep = com.example.ui.theme.categoryHeroDeepColor(cat)
+            val heroLight = com.example.ui.theme.categoryHeroLightColor(cat)
 
             assertTrue("On-white pill contrast for $cat was too low", contrastRatio(onContainer, white) >= 4.5)
             assertTrue("On-container contrast for $cat was too low", contrastRatio(onContainer, container) >= 4.5)
             assertTrue("White-on-accent contrast for $cat was too low", contrastRatio(white, accent) >= 4.5)
+            assertTrue("White-on-heroDeep contrast for $cat was too low", contrastRatio(white, heroDeep) >= 4.5)
+            assertTrue("White-on-heroLight contrast for $cat was too low", contrastRatio(white, heroLight) >= 4.5)
         }
+
+        // Thai stock keeps the original Deep Navy institutional color
+        assertEquals(com.example.ui.theme.NavyHeaderDeep, com.example.ui.theme.categoryHeroDeepColor(AssetCategory.THAI_STOCK))
+        assertEquals(com.example.ui.theme.NavyPrimary, com.example.ui.theme.categoryAccentColor(AssetCategory.THAI_STOCK))
+
+        // Every AssetCategory has a unique, non-repeating theme color set
+        val allCats = AssetCategory.entries
+        assertEquals(allCats.size, allCats.map { com.example.ui.theme.categoryHeroDeepColor(it) }.distinct().size)
+        assertEquals(allCats.size, allCats.map { com.example.ui.theme.categoryAccentColor(it) }.distinct().size)
+        assertEquals(allCats.size, allCats.map { com.example.ui.theme.categoryContainerColor(it) }.distinct().size)
     }
 }

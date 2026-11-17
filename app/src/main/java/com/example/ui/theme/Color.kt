@@ -65,11 +65,41 @@ val FundGreenHighlight = Color(0xFF15803D)
 val PureWhiteSurface = Color(0xFFFFFFFF)
 
 // Institutional Wealth / Banking Palette (inspired by Streaming Fund+ aesthetic)
+// 1. Thai Stocks (สีเดิม: Deep Institutional Navy)
 val NavyHeaderDeep = Color(0xFF0F2B4F)
 val NavyPrimary = Color(0xFF194276)
 val NavyBright = Color(0xFF235596)
 val NavyContainer = Color(0xFFE8F0FA)
 val NavyOnContainer = Color(0xFF0F2B4F)
+
+// 2. Global Stocks (Royal Executive Indigo)
+val GlobalIndigoDeep = Color(0xFF24144D)
+val GlobalIndigoPrimary = Color(0xFF432687)
+val GlobalIndigoBright = Color(0xFF5635A6)
+val GlobalIndigoContainer = Color(0xFFEDE9FE)
+val GlobalIndigoOnContainer = Color(0xFF2E1065)
+
+// 3. Mutual Funds / ETF (Private Bank Forest Emerald)
+val FundEmeraldDeep = Color(0xFF0A3624)
+val FundEmeraldPrimary = Color(0xFF136342)
+val FundEmeraldBright = Color(0xFF197D54)
+val FundEmeraldContainer = Color(0xFFE1F5EC)
+val FundEmeraldOnContainer = Color(0xFF0A3624)
+
+// 4. Gold (Bullion Bronze / Executive Warm Gold)
+val GoldBronzeDeep = Color(0xFF472504)
+val GoldBronzePrimary = Color(0xFF8C4E0A)
+val GoldBronzeBright = Color(0xFFA86010)
+val GoldBronzeContainer = Color(0xFFFEF3C7)
+val GoldBronzeOnContainer = Color(0xFF451A03)
+
+// 5. Crypto (Deep Ocean Petrol Teal)
+val CryptoTealDeep = Color(0xFF0A3542)
+val CryptoTealPrimary = Color(0xFF0E6478)
+val CryptoTealBright = Color(0xFF127C94)
+val CryptoTealContainer = Color(0xFFE0F2FE)
+val CryptoTealOnContainer = Color(0xFF083344)
+
 val WealthCanvasBg = Color(0xFFF3F6FA)
 val WealthSurfaceVariant = Color(0xFFECF1F7)
 val WealthHairlineBorder = Color(0xFFDCE4EE)
@@ -101,29 +131,53 @@ val ChartPalette = listOf(
     Color(0xFFC2410C)  // Deep Rust
 )
 
+fun categoryHeroDeepColor(category: AssetCategory?): Color = when (category) {
+    null, AssetCategory.THAI_STOCK -> NavyHeaderDeep
+    AssetCategory.GLOBAL_STOCK -> GlobalIndigoDeep
+    AssetCategory.MUTUAL_FUND -> FundEmeraldDeep
+    AssetCategory.GOLD -> GoldBronzeDeep
+    AssetCategory.CRYPTO -> CryptoTealDeep
+}
+
+fun categoryHeroLightColor(category: AssetCategory?): Color = when (category) {
+    null, AssetCategory.THAI_STOCK -> NavyPrimary
+    AssetCategory.GLOBAL_STOCK -> GlobalIndigoPrimary
+    AssetCategory.MUTUAL_FUND -> FundEmeraldPrimary
+    AssetCategory.GOLD -> GoldBronzePrimary
+    AssetCategory.CRYPTO -> CryptoTealPrimary
+}
+
+fun categorySecondaryColor(category: AssetCategory?): Color = when (category) {
+    null, AssetCategory.THAI_STOCK -> NavyBright
+    AssetCategory.GLOBAL_STOCK -> GlobalIndigoBright
+    AssetCategory.MUTUAL_FUND -> FundEmeraldBright
+    AssetCategory.GOLD -> GoldBronzeBright
+    AssetCategory.CRYPTO -> CryptoTealBright
+}
+
 fun categoryAccentColor(category: AssetCategory?): Color = when (category) {
     null -> GoldAccentTextLight
-    AssetCategory.THAI_STOCK -> StockOrangePrimary
-    AssetCategory.GLOBAL_STOCK -> GlobalPurplePrimary
-    AssetCategory.CRYPTO -> CryptoYellowHighlight
-    AssetCategory.GOLD -> GoldBluePrimary
-    AssetCategory.MUTUAL_FUND -> FundGreenPrimary
+    AssetCategory.THAI_STOCK -> NavyPrimary
+    AssetCategory.GLOBAL_STOCK -> GlobalIndigoPrimary
+    AssetCategory.MUTUAL_FUND -> FundEmeraldPrimary
+    AssetCategory.GOLD -> GoldBronzePrimary
+    AssetCategory.CRYPTO -> CryptoTealPrimary
 }
 
 fun categoryContainerColor(category: AssetCategory?): Color = when (category) {
     null -> SoftYellowContainer
-    AssetCategory.THAI_STOCK -> StockOrangeContainer
-    AssetCategory.GLOBAL_STOCK -> GlobalPurpleContainer
-    AssetCategory.CRYPTO -> CryptoYellowContainer
-    AssetCategory.GOLD -> GoldBlueContainer
-    AssetCategory.MUTUAL_FUND -> FundGreenContainer
+    AssetCategory.THAI_STOCK -> NavyContainer
+    AssetCategory.GLOBAL_STOCK -> GlobalIndigoContainer
+    AssetCategory.MUTUAL_FUND -> FundEmeraldContainer
+    AssetCategory.GOLD -> GoldBronzeContainer
+    AssetCategory.CRYPTO -> CryptoTealContainer
 }
 
 fun categoryOnContainerColor(category: AssetCategory?): Color = when (category) {
     null -> DeepAmberOnContainer
-    AssetCategory.THAI_STOCK -> StockOrangeOnContainer
-    AssetCategory.GLOBAL_STOCK -> GlobalPurpleOnContainer
-    AssetCategory.CRYPTO -> CryptoYellowOnContainer
-    AssetCategory.GOLD -> GoldBlueOnContainer
-    AssetCategory.MUTUAL_FUND -> FundGreenOnContainer
+    AssetCategory.THAI_STOCK -> NavyOnContainer
+    AssetCategory.GLOBAL_STOCK -> GlobalIndigoOnContainer
+    AssetCategory.MUTUAL_FUND -> FundEmeraldOnContainer
+    AssetCategory.GOLD -> GoldBronzeOnContainer
+    AssetCategory.CRYPTO -> CryptoTealOnContainer
 }

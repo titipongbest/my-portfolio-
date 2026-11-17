@@ -10,11 +10,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -49,6 +47,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -247,25 +248,19 @@ private fun HoldingDetailCard(
             .clickable { isExpanded = !isExpanded }
             .testTag("holding_card_${h.symbol}")
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(IntrinsicSize.Min)
+                .drawBehind {
+                    drawRect(
+                        color = stripeColor,
+                        topLeft = Offset.Zero,
+                        size = Size(5.dp.toPx(), size.height)
+                    )
+                }
+                .padding(start = 19.dp, end = 14.dp, top = 14.dp, bottom = 14.dp)
         ) {
-            // Signature Left Institutional Color Accent Bar
-            Box(
-                modifier = Modifier
-                    .width(5.dp)
-                    .fillMaxHeight()
-                    .background(stripeColor)
-            )
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 14.dp, vertical = 14.dp)
-            ) {
-                // Header Row: Symbol + Allocation Pill + Actions
+            // Header Row: Symbol + Allocation Pill + Actions
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -569,7 +564,6 @@ private fun HoldingDetailCard(
                 }
             }
         }
-    }
 }
 
 @Composable

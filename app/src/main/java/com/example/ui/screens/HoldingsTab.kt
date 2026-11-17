@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,9 +10,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -51,15 +54,16 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.data.QuoteSource
 import com.example.model.AnalyzedHolding
 import com.example.model.Holding
 import com.example.ui.FormatUtils
 import com.example.ui.PortfolioUiState
+import com.example.ui.theme.ChartPalette
 import com.example.ui.theme.LocalPortfolioColors
 import com.example.ui.theme.NumericStyleMedium
 import com.example.ui.theme.NumericStyleSmall
-import com.example.ui.theme.categoryAccentColor
 import com.example.ui.theme.categoryContainerColor
 import com.example.ui.theme.categoryOnContainerColor
 
@@ -112,7 +116,7 @@ fun HoldingsTab(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
@@ -124,17 +128,17 @@ fun HoldingsTab(
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = "ค้นหา",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = portfolioColors.mutedSlate
                     )
                 },
                 singleLine = true,
-                textStyle = MaterialTheme.typography.bodyLarge,
+                textStyle = MaterialTheme.typography.bodyMedium,
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = portfolioColors.costBoxBorder,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                     focusedTextColor = MaterialTheme.colorScheme.onSurface,
                     unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                 ),
@@ -144,14 +148,40 @@ fun HoldingsTab(
             )
         }
 
+        if (filtered.isNotEmpty()) {
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "รายการ${uiState.selectedCategory.shortLabelTh} (${filtered.size})",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = "แตะที่รายการเพื่อดูรายละเอียดต้นทุน",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = portfolioColors.mutedSlate
+                    )
+                }
+            }
+        }
+
         if (filtered.isEmpty()) {
             item {
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(18.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(18.dp))
+                    shape = RoundedCornerShape(16.dp),
+                    shadowElevation = 1.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         text = if (uiState.allHoldings.none { it.assetCategory == uiState.selectedCategory }) {
@@ -173,6 +203,7 @@ fun HoldingsTab(
                 HoldingDetailCard(
                     item = filtered[idx],
                     sectorLabel = filtered[idx].holding.resolveSectorLabel(uiState.managedSectors),
+                    stripeColor = ChartPalette[idx % ChartPalette.size],
                     onEdit = { onEditHolding(filtered[idx].holding) },
                     onDelete = { holdingPendingDelete = filtered[idx].holding },
                     onViewDividends = { onViewDividends(filtered[idx].holding) }
@@ -189,6 +220,7 @@ fun HoldingsTab(
 private fun HoldingDetailCard(
     item: AnalyzedHolding,
     sectorLabel: String,
+    stripeColor: Color,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onViewDividends: () -> Unit
@@ -199,273 +231,339 @@ private fun HoldingDetailCard(
     val pnlBg = if (isGain) portfolioColors.profitContainer else portfolioColors.lossContainer
     val h = item.holding
 
-    // Collapsed by default: shows header + green/red P&L summary bar, tap to expand Cost vs Current boxes
     var isExpanded by remember(h.id) { mutableStateOf(false) }
 
     val catContainer = categoryContainerColor(h.assetCategory)
     val catOnContainer = categoryOnContainerColor(h.assetCategory)
-    val catAccent = categoryAccentColor(h.assetCategory)
 
-    Column(
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(16.dp),
+        shadowElevation = 2.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable { isExpanded = !isExpanded }
-            .padding(16.dp)
             .testTag("holding_card_${h.symbol}")
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
         ) {
+            // Signature Left Institutional Color Accent Bar
             Box(
                 modifier = Modifier
-                    .size(46.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(catContainer),
-                contentAlignment = Alignment.Center
+                    .width(5.dp)
+                    .fillMaxHeight()
+                    .background(stripeColor)
+            )
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 14.dp, vertical = 14.dp)
             ) {
-                Text(
-                    text = h.symbol.take(4),
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                    color = catOnContainer
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = h.symbol,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Surface(
-                        color = catContainer,
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
+                // Header Row: Symbol + Allocation Pill + Actions
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = h.symbol,
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = FormatUtils.formatPercent(item.allocationPercentOfTotal, decimals = 1),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
                         Text(
-                            text = FormatUtils.formatPercent(item.allocationPercentOfTotal, decimals = 1),
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                            color = catAccent,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            text = h.displayName,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = portfolioColors.mutedSlate,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-                }
-                Text(
-                    text = h.displayName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (h.assetCategory.isStock) {
-                    IconButton(
-                        onClick = onViewDividends,
-                        modifier = Modifier.testTag("dividend_info_button_${h.symbol}")
-                    ) {
-                        Box(
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (h.assetCategory.isStock) {
+                            IconButton(
+                                onClick = onViewDividends,
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .testTag("dividend_info_button_${h.symbol}")
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PriorityHigh,
+                                        contentDescription = "ดูข้อมูลปันผลในอนาคตของ ${h.symbol}",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                        IconButton(
+                            onClick = onEdit,
                             modifier = Modifier
-                                .size(30.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primaryContainer)
-                                .border(1.dp, catAccent.copy(alpha = 0.65f), CircleShape),
-                            contentAlignment = Alignment.Center
+                                .size(36.dp)
+                                .testTag("edit_holding_${h.symbol}")
                         ) {
                             Icon(
-                                imageVector = Icons.Default.PriorityHigh,
-                                contentDescription = "ดูข้อมูลปันผลในอนาคตของ ${h.symbol}",
-                                tint = catAccent,
-                                modifier = Modifier.size(18.dp)
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "แก้ไข ${h.symbol}",
+                                tint = portfolioColors.mutedSlate,
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .testTag("delete_holding_${h.symbol}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteOutline,
+                                contentDescription = "ลบ ${h.symbol}",
+                                tint = portfolioColors.loss,
+                                modifier = Modifier.size(19.dp)
                             )
                         }
                     }
                 }
-                IconButton(
-                    onClick = onEdit,
-                    modifier = Modifier.testTag("edit_holding_${h.symbol}")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "แก้ไข ${h.symbol}",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.testTag("delete_holding_${h.symbol}")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DeleteOutline,
-                        contentDescription = "ลบ ${h.symbol}",
-                        tint = portfolioColors.loss,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
 
-        Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            TagChip(text = h.assetCategory.shortLabelTh)
-            if (h.assetCategory.isStock) {
-                TagChip(text = sectorLabel)
-            }
-            TagChip(
-                text = when (item.priceSource) {
-                    QuoteSource.UNAVAILABLE -> "รอราคาตลาด"
-                    QuoteSource.MANUAL -> "ราคากรอกเอง"
-                    else -> "ราคาตลาดจริง"
-                }
-            )
-        }
-
-        // Expandable Cost vs Current Comparison Boxes (separated cleanly by color)
-        AnimatedVisibility(visible = isExpanded) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Row 1: Unit Cost (Cool Slate) vs Current Price (Category Accent Tint)
+                // Clean Institutional 3-Column Metrics Strip (Cost | Value | P&L %)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    MetricBox(
-                        label = "จำนวน × ทุน/หน่วย",
-                        value = "${FormatUtils.formatQuantity(h.quantity)} × ${FormatUtils.formatOriginalCurrency(h.buyPricePerUnit, h.currency)}",
-                        containerColor = portfolioColors.costBoxBg,
-                        borderColor = portfolioColors.costBoxBorder,
-                        labelColor = portfolioColors.costBoxLabel,
-                        valueColor = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricBox(
-                        label = "ราคาปัจจุบัน/หน่วย",
-                        value = if (item.isEstimatedUsingCost) {
-                            "รอราคา (ใช้ทุน)"
-                        } else {
-                            val displayPrice = if (h.currency == "THB") {
-                                FormatUtils.formatThb(item.effectiveCurrentPriceThb)
-                            } else {
-                                val origCurr = item.quote?.originalCurrency ?: h.currency
-                                FormatUtils.formatOriginalCurrency(item.effectiveCurrentPriceOriginal, origCurr)
-                            }
-                            buildString {
-                                append(displayPrice)
-                                item.dailyChangePercent?.let { chg ->
-                                    append(" (${FormatUtils.formatPercent(chg, showSign = true, decimals = 1)})")
-                                }
-                            }
-                        },
-                        containerColor = catContainer.copy(alpha = 0.55f),
-                        borderColor = catAccent.copy(alpha = 0.6f),
-                        labelColor = catAccent,
-                        valueColor = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Row 2: Total Cost Value (Cool Slate) vs Total Current Value (Category Accent Tint)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    MetricBox(
-                        label = "มูลค่าทุนรวม",
-                        value = FormatUtils.formatThb(item.costBasisThb),
-                        containerColor = portfolioColors.costBoxBg,
-                        borderColor = portfolioColors.costBoxBorder,
-                        labelColor = portfolioColors.costBoxLabel,
-                        valueColor = MaterialTheme.colorScheme.onSurface,
-                        isEmphasized = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricBox(
-                        label = "มูลค่าปัจจุบัน",
-                        value = FormatUtils.formatThb(item.currentValueThb),
-                        containerColor = catContainer.copy(alpha = 0.55f),
-                        borderColor = catAccent.copy(alpha = 0.6f),
-                        labelColor = catAccent,
-                        valueColor = catOnContainer,
-                        isEmphasized = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Always visible Green/Red P&L Box with Expand/Collapse Indicator
-        Surface(
-            color = pnlBg,
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, pnlColor.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
-                .testTag("holding_pnl_bar_${h.symbol}")
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = if (isExpanded) "ย่อรายละเอียด" else "ขยายดูทุนและมูลค่าปัจจุบัน",
-                        tint = pnlColor,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = if (isGain) "ส่วนต่างกำไร" else "ส่วนต่างขาดทุน",
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                        color = pnlColor
-                    )
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = FormatUtils.formatThb(item.profitLossThb, showSign = true),
-                        style = NumericStyleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = pnlColor
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "เงินลงทุน (บาท)",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                            color = portfolioColors.mutedSlate
                         )
-                    )
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                        shape = RoundedCornerShape(8.dp)
+                        Text(
+                            text = FormatUtils.formatNumber(item.costBasisThb, 2),
+                            style = NumericStyleSmall.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.End
                     ) {
                         Text(
-                            text = FormatUtils.formatPercent(item.profitLossPercent, showSign = true),
+                            text = "มูลค่า (บาท)",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                            color = portfolioColors.mutedSlate
+                        )
+                        Text(
+                            text = FormatUtils.formatNumber(item.currentValueThb, 2),
                             style = NumericStyleSmall.copy(
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Column(
+                        modifier = Modifier.weight(0.95f),
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        Text(
+                            text = "%กำไร/ขาดทุน",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                            color = portfolioColors.mutedSlate
+                        )
+                        Text(
+                            text = FormatUtils.formatPercent(item.profitLossPercent, decimals = 2, showSign = true),
+                            style = NumericStyleSmall.copy(
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = pnlColor
                             ),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    TagChip(
+                        text = h.assetCategory.shortLabelTh,
+                        containerColor = catContainer,
+                        textColor = catOnContainer
+                    )
+                    if (h.assetCategory.isStock) {
+                        TagChip(text = sectorLabel)
+                    }
+                    TagChip(
+                        text = when (item.priceSource) {
+                            QuoteSource.UNAVAILABLE -> "รอราคาตลาด"
+                            QuoteSource.MANUAL -> "ราคากรอกเอง"
+                            else -> "ราคาตลาดจริง"
+                        }
+                    )
+                }
+
+                // Expandable Cost vs Current Breakdown
+                AnimatedVisibility(visible = isExpanded) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            MetricBox(
+                                label = "จำนวน × ทุน/หน่วย",
+                                value = "${FormatUtils.formatQuantity(h.quantity)} × ${FormatUtils.formatOriginalCurrency(h.buyPricePerUnit, h.currency)}",
+                                containerColor = portfolioColors.costBoxBg,
+                                borderColor = portfolioColors.costBoxBorder,
+                                labelColor = portfolioColors.costBoxLabel,
+                                valueColor = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
+                            )
+                            MetricBox(
+                                label = "ราคาปัจจุบัน/หน่วย",
+                                value = if (item.isEstimatedUsingCost) {
+                                    "รอราคา (ใช้ทุน)"
+                                } else {
+                                    val displayPrice = if (h.currency == "THB") {
+                                        FormatUtils.formatThb(item.effectiveCurrentPriceThb)
+                                    } else {
+                                        val origCurr = item.quote?.originalCurrency ?: h.currency
+                                        FormatUtils.formatOriginalCurrency(item.effectiveCurrentPriceOriginal, origCurr)
+                                    }
+                                    buildString {
+                                        append(displayPrice)
+                                        item.dailyChangePercent?.let { chg ->
+                                            append(" (${FormatUtils.formatPercent(chg, showSign = true, decimals = 1)})")
+                                        }
+                                    }
+                                },
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                                labelColor = MaterialTheme.colorScheme.primary,
+                                valueColor = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            MetricBox(
+                                label = "มูลค่าทุนรวม",
+                                value = FormatUtils.formatThb(item.costBasisThb),
+                                containerColor = portfolioColors.costBoxBg,
+                                borderColor = portfolioColors.costBoxBorder,
+                                labelColor = portfolioColors.costBoxLabel,
+                                valueColor = MaterialTheme.colorScheme.onSurface,
+                                isEmphasized = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            MetricBox(
+                                label = "มูลค่าปัจจุบัน",
+                                value = FormatUtils.formatThb(item.currentValueThb),
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                                labelColor = MaterialTheme.colorScheme.primary,
+                                valueColor = MaterialTheme.colorScheme.primary,
+                                isEmphasized = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Compact Institutional P&L Summary Bar
+                Surface(
+                    color = pnlBg,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, pnlColor.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
+                        .testTag("holding_pnl_bar_${h.symbol}")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (isExpanded) "ย่อรายละเอียด" else "ขยายดูทุนและมูลค่าปัจจุบัน",
+                                tint = pnlColor,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = if (isGain) "กำไรสุทธิ" else "ขาดทุนสุทธิ",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = pnlColor
+                            )
+                        }
+                        Text(
+                            text = "${FormatUtils.formatThb(item.profitLossThb, showSign = true)} (${FormatUtils.formatPercent(item.profitLossPercent, showSign = true)})",
+                            style = NumericStyleSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = pnlColor
+                            )
                         )
                     }
                 }
@@ -475,17 +573,23 @@ private fun HoldingDetailCard(
 }
 
 @Composable
-private fun TagChip(text: String) {
+private fun TagChip(
+    text: String,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    textColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
+) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.border(0.8.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
+        color = containerColor,
+        shape = RoundedCornerShape(6.dp)
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            ),
+            color = textColor,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
         )
     }
 }
@@ -503,11 +607,11 @@ private fun MetricBox(
 ) {
     Surface(
         color = containerColor,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
         modifier = modifier.border(
-            width = 1.2.dp,
+            width = 1.dp,
             color = borderColor,
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(10.dp)
         )
     ) {
         Column(
@@ -516,7 +620,10 @@ private fun MetricBox(
         ) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                ),
                 color = labelColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -524,7 +631,7 @@ private fun MetricBox(
             Text(
                 text = value,
                 style = if (isEmphasized) {
-                    NumericStyleMedium.copy(fontWeight = FontWeight.Bold)
+                    NumericStyleMedium.copy(fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 } else {
                     NumericStyleSmall.copy(fontWeight = FontWeight.SemiBold)
                 },

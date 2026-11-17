@@ -118,7 +118,9 @@ fun BackupScreenDialog(
             topBar = {
                 TopAppBar(
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background
+                        containerColor = portfolioColors.navyHeroDeep,
+                        navigationIconContentColor = androidx.compose.ui.graphics.Color.White,
+                        titleContentColor = androidx.compose.ui.graphics.Color.White
                     ),
                     navigationIcon = {
                         IconButton(
@@ -127,7 +129,8 @@ fun BackupScreenDialog(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "กลับ"
+                                contentDescription = "กลับ",
+                                tint = androidx.compose.ui.graphics.Color.White
                             )
                         }
                     },
@@ -136,7 +139,7 @@ fun BackupScreenDialog(
                             Icon(
                                 imageVector = Icons.Default.Backup,
                                 contentDescription = null,
-                                tint = portfolioColors.accentHighlight,
+                                tint = androidx.compose.ui.graphics.Color.White,
                                 modifier = Modifier.size(22.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
@@ -144,12 +147,12 @@ fun BackupScreenDialog(
                                 Text(
                                     text = "สำรองและกู้คืนข้อมูล",
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.onBackground
+                                    color = androidx.compose.ui.graphics.Color.White
                                 )
                                 Text(
                                     text = "รวมทุกหมวดหมู่ทั้งหมด $holdingsCount รายการในไฟล์เดียว",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = androidx.compose.ui.graphics.Color(0xFFCBD5E1)
                                 )
                             }
                         }
@@ -161,17 +164,18 @@ fun BackupScreenDialog(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 // 1. Automatic Backup Card (Save & Overwrite Same File on Update)
                 item {
                     Surface(
                         color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(22.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        shadowElevation = 2.dp,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.2.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(22.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
                     ) {
                         Column(modifier = Modifier.padding(18.dp)) {
                             Row(
@@ -428,10 +432,11 @@ private fun BackupActionCard(
     val portfolioColors = LocalPortfolioColors.current
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(16.dp),
+        shadowElevation = 2.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(22.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

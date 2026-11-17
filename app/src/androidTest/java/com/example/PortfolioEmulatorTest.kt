@@ -281,6 +281,26 @@ class PortfolioEmulatorTest {
                 true
             }.getOrDefault(false)
         }
+
+        // 5) Verify remade professional wealth UI across Dashboard, Analytics, and Holdings tabs
+        composeRule.onNode(hasText("มูลค่าพอร์ต"), useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNode(hasText("เงินลงทุน (ต้นทุน)"), useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onAllNodes(hasText("%กำไร/ขาดทุน"), useUnmergedTree = true)[0].assertIsDisplayed()
+        composeRule.onNode(hasText("PTT"), useUnmergedTree = true).assertIsDisplayed()
+
+        // Switch to Analytics tab and verify sector card renders cleanly
+        composeRule.onNodeWithTag("nav_tab_ANALYTICS").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("sector_card_ENERGY").performScrollTo().assertIsDisplayed()
+
+        // Switch to Holdings tab, verify holding card + expandable breakdown
+        composeRule.onNodeWithTag("nav_tab_HOLDINGS").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("holding_card_PTT").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("holding_pnl_bar_PTT").assertIsDisplayed()
+        composeRule.onNodeWithTag("holding_card_PTT").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNode(hasText("มูลค่าทุนรวม"), useUnmergedTree = true).assertIsDisplayed()
     }
 
     private fun performFingerTap(nodeInteraction: SemanticsNodeInteraction) {

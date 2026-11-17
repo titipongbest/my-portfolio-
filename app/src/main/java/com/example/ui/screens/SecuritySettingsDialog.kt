@@ -134,7 +134,9 @@ fun SecuritySettingsDialog(
             topBar = {
                 TopAppBar(
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background
+                        containerColor = portfolioColors.navyHeroDeep,
+                        navigationIconContentColor = androidx.compose.ui.graphics.Color.White,
+                        titleContentColor = androidx.compose.ui.graphics.Color.White
                     ),
                     navigationIcon = {
                         IconButton(
@@ -150,7 +152,8 @@ fun SecuritySettingsDialog(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "กลับ"
+                                contentDescription = "กลับ",
+                                tint = androidx.compose.ui.graphics.Color.White
                             )
                         }
                     },
@@ -159,7 +162,7 @@ fun SecuritySettingsDialog(
                             Icon(
                                 imageVector = Icons.Default.Security,
                                 contentDescription = null,
-                                tint = portfolioColors.accentHighlight,
+                                tint = androidx.compose.ui.graphics.Color.White,
                                 modifier = Modifier.size(22.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
@@ -167,7 +170,7 @@ fun SecuritySettingsDialog(
                                 Text(
                                     text = "ความปลอดภัยและล็อกแอป",
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.onBackground
+                                    color = androidx.compose.ui.graphics.Color.White
                                 )
                                 Text(
                                     text = if (securityConfig.isPinEnabled) {
@@ -176,7 +179,7 @@ fun SecuritySettingsDialog(
                                         "ตั้งรหัส PIN ${PortfolioSettingsStore.PIN_LENGTH} หลัก เพื่อปกป้องข้อมูลพอร์ตของคุณ"
                                     },
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = androidx.compose.ui.graphics.Color(0xFFCBD5E1)
                                 )
                             }
                         }

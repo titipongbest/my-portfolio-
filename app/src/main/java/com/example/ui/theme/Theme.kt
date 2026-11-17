@@ -3,7 +3,6 @@ package com.example.ui.theme
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.lightColorScheme
@@ -23,7 +22,13 @@ data class PortfolioSemanticColors(
     val accentHighlight: Color,
     val costBoxBg: Color,
     val costBoxBorder: Color,
-    val costBoxLabel: Color
+    val costBoxLabel: Color,
+    val navyHeroDeep: Color = NavyHeaderDeep,
+    val navyHeroLight: Color = NavyPrimary,
+    val mutedSlate: Color = WealthSlateMuted,
+    val categoryAccent: Color = NavyPrimary,
+    val categoryContainer: Color = NavyContainer,
+    val categoryOnContainer: Color = NavyOnContainer
 )
 
 val LocalPortfolioColors = staticCompositionLocalOf {
@@ -32,138 +37,40 @@ val LocalPortfolioColors = staticCompositionLocalOf {
         profitContainer = ProfitGreenContainerLight,
         loss = LossRedLight,
         lossContainer = LossRedContainerLight,
-        accentHighlight = GoldAccentTextLight,
+        accentHighlight = NavyPrimary,
         costBoxBg = CostBoxBg,
         costBoxBorder = CostBoxBorder,
-        costBoxLabel = CostBoxLabelColor
+        costBoxLabel = CostBoxLabelColor,
+        navyHeroDeep = NavyHeaderDeep,
+        navyHeroLight = NavyPrimary,
+        mutedSlate = WealthSlateMuted,
+        categoryAccent = NavyPrimary,
+        categoryContainer = NavyContainer,
+        categoryOnContainer = NavyOnContainer
     )
 }
 
-private val StockOrangeScheme = lightColorScheme(
-    primary = StockOrangePrimary,
+private val InstitutionalWealthScheme = lightColorScheme(
+    primary = NavyPrimary,
     onPrimary = Color.White,
-    primaryContainer = StockOrangeContainer,
-    onPrimaryContainer = StockOrangeOnContainer,
-    secondary = StockOrangeHighlight,
+    primaryContainer = NavyContainer,
+    onPrimaryContainer = NavyOnContainer,
+    secondary = NavyBright,
     onSecondary = Color.White,
-    secondaryContainer = StockOrangeContainer,
-    onSecondaryContainer = StockOrangeOnContainer,
+    secondaryContainer = NavyContainer,
+    onSecondaryContainer = NavyOnContainer,
     tertiary = SlateBlueTertiary,
     onTertiary = WhiteOnTertiary,
     tertiaryContainer = PaleSkyContainer,
     onTertiaryContainer = DeepSkyOnContainer,
-    background = StockOrangeBg,
+    background = WealthCanvasBg,
     onBackground = TextPrimaryLight,
     surface = PureWhiteSurface,
     onSurface = TextPrimaryLight,
-    surfaceVariant = StockOrangeSurfaceVariant,
+    surfaceVariant = WealthSurfaceVariant,
     onSurfaceVariant = TextSecondaryLight,
-    outline = StockOrangeBorder,
-    outlineVariant = StockOrangeBorder,
-    error = LossRedLight,
-    errorContainer = LossRedContainerLight,
-    onErrorContainer = Color(0xFF7F1D1D)
-)
-
-private val GlobalStockPurpleScheme = lightColorScheme(
-    primary = GlobalPurplePrimary,
-    onPrimary = Color.White,
-    primaryContainer = GlobalPurpleContainer,
-    onPrimaryContainer = GlobalPurpleOnContainer,
-    secondary = GlobalPurpleHighlight,
-    onSecondary = Color.White,
-    secondaryContainer = GlobalPurpleContainer,
-    onSecondaryContainer = GlobalPurpleOnContainer,
-    tertiary = SlateBlueTertiary,
-    onTertiary = WhiteOnTertiary,
-    tertiaryContainer = PaleSkyContainer,
-    onTertiaryContainer = DeepSkyOnContainer,
-    background = GlobalPurpleBg,
-    onBackground = TextPrimaryLight,
-    surface = PureWhiteSurface,
-    onSurface = TextPrimaryLight,
-    surfaceVariant = GlobalPurpleSurfaceVariant,
-    onSurfaceVariant = TextSecondaryLight,
-    outline = GlobalPurpleBorder,
-    outlineVariant = GlobalPurpleBorder,
-    error = LossRedLight,
-    errorContainer = LossRedContainerLight,
-    onErrorContainer = Color(0xFF7F1D1D)
-)
-
-private val CryptoYellowScheme = lightColorScheme(
-    primary = CryptoYellowPrimary,
-    onPrimary = DarkInkOnYellow,
-    primaryContainer = CryptoYellowContainer,
-    onPrimaryContainer = CryptoYellowOnContainer,
-    secondary = CryptoYellowHighlight,
-    onSecondary = Color.White,
-    secondaryContainer = CryptoYellowContainer,
-    onSecondaryContainer = CryptoYellowOnContainer,
-    tertiary = SlateBlueTertiary,
-    onTertiary = WhiteOnTertiary,
-    tertiaryContainer = PaleSkyContainer,
-    onTertiaryContainer = DeepSkyOnContainer,
-    background = CryptoYellowBg,
-    onBackground = TextPrimaryLight,
-    surface = PureWhiteSurface,
-    onSurface = TextPrimaryLight,
-    surfaceVariant = CryptoYellowSurfaceVariant,
-    onSurfaceVariant = TextSecondaryLight,
-    outline = CryptoYellowBorder,
-    outlineVariant = CryptoYellowBorder,
-    error = LossRedLight,
-    errorContainer = LossRedContainerLight,
-    onErrorContainer = Color(0xFF7F1D1D)
-)
-
-private val GoldBlueScheme = lightColorScheme(
-    primary = GoldBluePrimary,
-    onPrimary = Color.White,
-    primaryContainer = GoldBlueContainer,
-    onPrimaryContainer = GoldBlueOnContainer,
-    secondary = GoldBlueHighlight,
-    onSecondary = Color.White,
-    secondaryContainer = GoldBlueContainer,
-    onSecondaryContainer = GoldBlueOnContainer,
-    tertiary = WarmGoldSecondary,
-    onTertiary = Color.White,
-    tertiaryContainer = SoftYellowContainer,
-    onTertiaryContainer = DeepAmberOnContainer,
-    background = GoldBlueBg,
-    onBackground = TextPrimaryLight,
-    surface = PureWhiteSurface,
-    onSurface = TextPrimaryLight,
-    surfaceVariant = GoldBlueSurfaceVariant,
-    onSurfaceVariant = TextSecondaryLight,
-    outline = GoldBlueBorder,
-    outlineVariant = GoldBlueBorder,
-    error = LossRedLight,
-    errorContainer = LossRedContainerLight,
-    onErrorContainer = Color(0xFF7F1D1D)
-)
-
-private val FundGreenScheme = lightColorScheme(
-    primary = FundGreenPrimary,
-    onPrimary = Color.White,
-    primaryContainer = FundGreenContainer,
-    onPrimaryContainer = FundGreenOnContainer,
-    secondary = FundGreenHighlight,
-    onSecondary = Color.White,
-    secondaryContainer = FundGreenContainer,
-    onSecondaryContainer = FundGreenOnContainer,
-    tertiary = SlateBlueTertiary,
-    onTertiary = WhiteOnTertiary,
-    tertiaryContainer = PaleSkyContainer,
-    onTertiaryContainer = DeepSkyOnContainer,
-    background = FundGreenBg,
-    onBackground = TextPrimaryLight,
-    surface = PureWhiteSurface,
-    onSurface = TextPrimaryLight,
-    surfaceVariant = FundGreenSurfaceVariant,
-    onSurfaceVariant = TextSecondaryLight,
-    outline = FundGreenBorder,
-    outlineVariant = FundGreenBorder,
+    outline = WealthHairlineBorder,
+    outlineVariant = WealthHairlineBorder,
     error = LossRedLight,
     errorContainer = LossRedContainerLight,
     onErrorContainer = Color(0xFF7F1D1D)
@@ -171,77 +78,45 @@ private val FundGreenScheme = lightColorScheme(
 
 private val AppShapes = Shapes(
     small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(16.dp),
-    large = RoundedCornerShape(22.dp),
-    extraLarge = RoundedCornerShape(28.dp)
+    medium = RoundedCornerShape(14.dp),
+    large = RoundedCornerShape(18.dp),
+    extraLarge = RoundedCornerShape(24.dp)
 )
-
-@Composable
-private fun animateColorScheme(target: ColorScheme): ColorScheme {
-    val animSpec = tween<Color>(durationMillis = 280)
-    val primary by animateColorAsState(target.primary, animSpec, label = "primary")
-    val onPrimary by animateColorAsState(target.onPrimary, animSpec, label = "onPrimary")
-    val primaryContainer by animateColorAsState(target.primaryContainer, animSpec, label = "primaryContainer")
-    val onPrimaryContainer by animateColorAsState(target.onPrimaryContainer, animSpec, label = "onPrimaryContainer")
-    val secondary by animateColorAsState(target.secondary, animSpec, label = "secondary")
-    val background by animateColorAsState(target.background, animSpec, label = "background")
-    val surfaceVariant by animateColorAsState(target.surfaceVariant, animSpec, label = "surfaceVariant")
-    val outline by animateColorAsState(target.outline, animSpec, label = "outline")
-    return target.copy(
-        primary = primary,
-        onPrimary = onPrimary,
-        primaryContainer = primaryContainer,
-        onPrimaryContainer = onPrimaryContainer,
-        secondary = secondary,
-        background = background,
-        surfaceVariant = surfaceVariant,
-        outline = outline,
-        outlineVariant = outline
-    )
-}
 
 @Composable
 fun PortPulseTheme(
     selectedCategory: AssetCategory = AssetCategory.THAI_STOCK,
     content: @Composable () -> Unit
 ) {
-    val targetScheme = when (selectedCategory) {
-        AssetCategory.THAI_STOCK -> StockOrangeScheme
-        AssetCategory.GLOBAL_STOCK -> GlobalStockPurpleScheme
-        AssetCategory.CRYPTO -> CryptoYellowScheme
-        AssetCategory.GOLD -> GoldBlueScheme
-        AssetCategory.MUTUAL_FUND -> FundGreenScheme
-    }
+    val targetCatAccent = categoryAccentColor(selectedCategory)
+    val targetCatContainer = categoryContainerColor(selectedCategory)
+    val targetCatOnContainer = categoryOnContainerColor(selectedCategory)
 
-    val targetHighlight = when (selectedCategory) {
-        AssetCategory.THAI_STOCK -> StockOrangeHighlight
-        AssetCategory.GLOBAL_STOCK -> GlobalPurpleHighlight
-        AssetCategory.CRYPTO -> CryptoYellowHighlight
-        AssetCategory.GOLD -> GoldBlueHighlight
-        AssetCategory.MUTUAL_FUND -> FundGreenHighlight
-    }
-
-    val colorScheme = animateColorScheme(targetScheme)
-    val animatedHighlight by animateColorAsState(
-        targetValue = targetHighlight,
-        animationSpec = tween(durationMillis = 280),
-        label = "accentHighlight"
-    )
+    val animSpec = tween<Color>(durationMillis = 260)
+    val animatedCatAccent by animateColorAsState(targetCatAccent, animSpec, label = "catAccent")
+    val animatedCatContainer by animateColorAsState(targetCatContainer, animSpec, label = "catContainer")
+    val animatedCatOnContainer by animateColorAsState(targetCatOnContainer, animSpec, label = "catOnContainer")
 
     val semanticColors = PortfolioSemanticColors(
         profit = ProfitGreenLight,
         profitContainer = ProfitGreenContainerLight,
         loss = LossRedLight,
         lossContainer = LossRedContainerLight,
-        accentHighlight = animatedHighlight,
+        accentHighlight = NavyPrimary,
         costBoxBg = CostBoxBg,
         costBoxBorder = CostBoxBorder,
-        costBoxLabel = CostBoxLabelColor
+        costBoxLabel = CostBoxLabelColor,
+        navyHeroDeep = NavyHeaderDeep,
+        navyHeroLight = NavyPrimary,
+        mutedSlate = WealthSlateMuted,
+        categoryAccent = animatedCatAccent,
+        categoryContainer = animatedCatContainer,
+        categoryOnContainer = animatedCatOnContainer
     )
 
     CompositionLocalProvider(LocalPortfolioColors provides semanticColors) {
         MaterialTheme(
-            colorScheme = colorScheme,
+            colorScheme = InstitutionalWealthScheme,
             typography = AppTypography,
             shapes = AppShapes,
             content = content

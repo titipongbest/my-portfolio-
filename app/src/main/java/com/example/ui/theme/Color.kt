@@ -64,30 +64,41 @@ val FundGreenHighlight = Color(0xFF15803D)
 
 val PureWhiteSurface = Color(0xFFFFFFFF)
 
-// Financial Semantic Colors (High-contrast on Light White/Cream)
+// Institutional Wealth / Banking Palette (inspired by Streaming Fund+ aesthetic)
+val NavyHeaderDeep = Color(0xFF0F2B4F)
+val NavyPrimary = Color(0xFF194276)
+val NavyBright = Color(0xFF235596)
+val NavyContainer = Color(0xFFE8F0FA)
+val NavyOnContainer = Color(0xFF0F2B4F)
+val WealthCanvasBg = Color(0xFFF3F6FA)
+val WealthSurfaceVariant = Color(0xFFECF1F7)
+val WealthHairlineBorder = Color(0xFFDCE4EE)
+val WealthSlateMuted = Color(0xFF64748B)
+
+// Financial Semantic Colors (High-contrast on Pure White & Soft Containers)
 val ProfitGreenLight = Color(0xFF047857)
-val ProfitGreenContainerLight = Color(0xFFD1FAE5)
+val ProfitGreenContainerLight = Color(0xFFECFDF5)
 val LossRedLight = Color(0xFFB91C1C)
-val LossRedContainerLight = Color(0xFFFEE2E2)
+val LossRedContainerLight = Color(0xFFFEF2F2)
 val GoldAccentTextLight = Color(0xFF92400E)
 
 // Distinct Cost-Basis Box Colors (Cool Slate so Cost vs Current Value stands out clearly)
-val CostBoxBg = Color(0xFFF1F5F9)
-val CostBoxBorder = Color(0xFF94A3B8)
+val CostBoxBg = Color(0xFFF8FAFC)
+val CostBoxBorder = Color(0xFFCBD5E1)
 val CostBoxLabelColor = Color(0xFF475569)
 
-// High-contrast colorblind-friendly chart palette (every color is readable on white!)
+// Institutional Chart Palette (crisp blues, teals, violets, and high-contrast accents on white)
 val ChartPalette = listOf(
-    Color(0xFFEA580C), // Deep Orange
-    Color(0xFF7C3AED), // Royal Violet
-    Color(0xFF1D4ED8), // Deep Royal Blue
-    Color(0xFF15803D), // Deep Emerald Green
-    Color(0xFFB45309), // Rich Amber Gold
-    Color(0xFFBE123C), // Deep Rose
-    Color(0xFF0F766E), // Deep Teal
-    Color(0xFF4338CA), // Deep Indigo
-    Color(0xFF92400E), // Dark Honey
-    Color(0xFF4D7C0F)  // Deep Olive
+    Color(0xFF1D4ED8), // Cobalt Blue
+    Color(0xFF0369A1), // Deep Sky Blue
+    Color(0xFF0F766E), // Institutional Teal
+    Color(0xFF6D28D9), // Royal Violet
+    Color(0xFF1E3A8A), // Deep Indigo
+    Color(0xFFB45309), // Amber Gold
+    Color(0xFF047857), // Emerald Green
+    Color(0xFFBE123C), // Crimson Rose
+    Color(0xFF475569), // Institutional Slate
+    Color(0xFFC2410C)  // Deep Rust
 )
 
 fun categoryAccentColor(category: AssetCategory?): Color = when (category) {

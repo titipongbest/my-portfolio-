@@ -67,7 +67,8 @@ fun InteractiveDonutChart(
     selectedSliceId: String?,
     onSelectSlice: (String?) -> Unit,
     modifier: Modifier = Modifier,
-    showLegendList: Boolean = true
+    showLegendList: Boolean = true,
+    compactSideBySide: Boolean = false
 ) {
     val totalValue = slices.sumOf { it.valueThb }.coerceAtLeast(1e-9)
     val selected = slices.firstOrNull { it.id == selectedSliceId }
@@ -78,130 +79,87 @@ fun InteractiveDonutChart(
         label = "donut_sweep"
     )
 
+    if (compactSideBySide) {
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            DonutRingBox(
+                slices = slices,
+                totalValue = totalValue,
+                sweepProgress = sweepProgress,
+                selected = selected,
+                selectedSliceId = selectedSliceId,
+                centerTitle = centerTitle,
+                centerValueText = centerValueText,
+                centerSubText = null,
+                onSelectSlice = onSelectSlice,
+                ringSizeDp = 132,
+                isCompact = true
+            )
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                slices.forEach { slice ->
+                    val isSelected = slice.id == selectedSliceId
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (isSelected) slice.color.copy(alpha = 0.12f)
+                                else Color.Transparent
+                            )
+                            .clickable {
+                                onSelectSlice(if (isSelected) null else slice.id)
+                            }
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                            .testTag("donut_legend_${slice.id}"),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(9.dp)
+                                .clip(CircleShape)
+                                .background(slice.color)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "${slice.label}, ${FormatUtils.formatPercent(slice.percent, decimals = 2)}",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            ),
+                            color = if (isSelected) slice.color else MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+        return
+    }
+
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier
-                .size(220.dp)
-                .semantics { contentDescription = "$centerTitle $centerValueText" },
-            contentAlignment = Alignment.Center
-        ) {
-            val trackColor = MaterialTheme.colorScheme.surfaceVariant
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(slices, selectedSliceId) {
-                        detectTapGestures { offset ->
-                            val cx = size.width / 2f
-                            val cy = size.height / 2f
-                            val dx = offset.x - cx
-                            val dy = offset.y - cy
-                            val dist = hypot(dx, dy)
-                            val outerR = minOf(size.width, size.height) / 2f
-                            val innerR = outerR * 0.52f
-                            if (dist < innerR || dist > outerR) {
-                                onSelectSlice(null)
-                                return@detectTapGestures
-                            }
-                            var angle = (atan2(dy.toDouble(), dx.toDouble()) * 180.0 / PI + 90.0)
-                            if (angle < 0) angle += 360.0
-
-                            var cumulative = 0.0
-                            for (slice in slices) {
-                                val sweep = (slice.valueThb / totalValue) * 360.0
-                                if (angle >= cumulative && angle <= cumulative + sweep) {
-                                    onSelectSlice(if (selectedSliceId == slice.id) null else slice.id)
-                                    break
-                                }
-                                cumulative += sweep
-                            }
-                        }
-                    }
-            ) {
-                val strokeBase = size.minDimension * 0.16f
-                val padding = strokeBase / 2f + 12.dp.toPx()
-                val diameter = size.minDimension - padding * 2f
-                val topLeft = Offset(
-                    (size.width - diameter) / 2f,
-                    (size.height - diameter) / 2f
-                )
-                val arcSize = Size(diameter, diameter)
-
-                // Background track
-                drawArc(
-                    color = trackColor,
-                    startAngle = 0f,
-                    sweepAngle = 360f,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = strokeBase)
-                )
-
-                var startAngle = -90f
-                val gapDegrees = if (slices.size > 1) 2.2f else 0f
-
-                slices.forEach { slice ->
-                    val rawSweep = ((slice.valueThb / totalValue) * 360.0).toFloat() * sweepProgress
-                    val drawSweep = (rawSweep - gapDegrees).coerceAtLeast(1.2f)
-                    val isSelected = slice.id == selectedSliceId
-                    val alpha = if (selectedSliceId == null || isSelected) 1f else 0.35f
-                    val strokeWidth = if (isSelected) strokeBase * 1.24f else strokeBase
-
-                    drawArc(
-                        color = slice.color.copy(alpha = alpha),
-                        startAngle = startAngle,
-                        sweepAngle = drawSweep,
-                        useCenter = false,
-                        topLeft = topLeft,
-                        size = arcSize,
-                        style = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
-                    )
-                    startAngle += rawSweep
-                }
-            }
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(horizontal = 34.dp)
-            ) {
-                Text(
-                    text = selected?.label ?: centerTitle,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = if (selected != null) {
-                        FormatUtils.formatPercent(selected.percent, decimals = 1)
-                    } else {
-                        centerValueText
-                    },
-                    style = NumericStyleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = selected?.color ?: MaterialTheme.colorScheme.onSurface
-                    ),
-                    maxLines = 1,
-                    textAlign = TextAlign.Center
-                )
-                val sub = selected?.let { FormatUtils.formatThbCompact(it.valueThb) } ?: centerSubText
-                if (!sub.isNullOrBlank()) {
-                    Text(
-                        text = sub,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-        }
+        DonutRingBox(
+            slices = slices,
+            totalValue = totalValue,
+            sweepProgress = sweepProgress,
+            selected = selected,
+            selectedSliceId = selectedSliceId,
+            centerTitle = centerTitle,
+            centerValueText = centerValueText,
+            centerSubText = centerSubText,
+            onSelectSlice = onSelectSlice,
+            ringSizeDp = 212,
+            isCompact = false
+        )
 
         if (showLegendList) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -214,29 +172,30 @@ fun InteractiveDonutChart(
                 slices.forEach { slice ->
                     val isSelected = slice.id == selectedSliceId
                     val bg = if (isSelected) {
-                        slice.color.copy(alpha = 0.14f)
+                        slice.color.copy(alpha = 0.10f)
                     } else {
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+                        MaterialTheme.colorScheme.surface
                     }
-                    val border = if (isSelected) slice.color else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+                    val border = if (isSelected) slice.color else MaterialTheme.colorScheme.outline
 
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(RoundedCornerShape(12.dp))
                             .background(bg)
-                            .border(1.2.dp, border, RoundedCornerShape(14.dp))
+                            .border(1.dp, border, RoundedCornerShape(12.dp))
                             .clickable {
                                 onSelectSlice(if (isSelected) null else slice.id)
                             }
-                            .padding(horizontal = 14.dp, vertical = 12.dp)
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
                             .testTag("donut_legend_${slice.id}"),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(10.dp)
-                                .clip(CircleShape)
+                                .width(4.dp)
+                                .height(26.dp)
+                                .clip(RoundedCornerShape(2.dp))
                                 .background(slice.color)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
@@ -261,7 +220,7 @@ fun InteractiveDonutChart(
                         Spacer(modifier = Modifier.width(8.dp))
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                text = FormatUtils.formatPercent(slice.percent, decimals = 1),
+                                text = FormatUtils.formatPercent(slice.percent, decimals = 2),
                                 style = NumericStyleSmall.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = slice.color
@@ -281,6 +240,149 @@ fun InteractiveDonutChart(
 }
 
 @Composable
+private fun DonutRingBox(
+    slices: List<DonutSlice>,
+    totalValue: Double,
+    sweepProgress: Float,
+    selected: DonutSlice?,
+    selectedSliceId: String?,
+    centerTitle: String,
+    centerValueText: String,
+    centerSubText: String?,
+    onSelectSlice: (String?) -> Unit,
+    ringSizeDp: Int,
+    isCompact: Boolean
+) {
+    Box(
+        modifier = Modifier
+            .size(ringSizeDp.dp)
+            .semantics { contentDescription = "$centerTitle $centerValueText" },
+        contentAlignment = Alignment.Center
+    ) {
+        val trackColor = MaterialTheme.colorScheme.surfaceVariant
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(slices, selectedSliceId) {
+                    detectTapGestures { offset ->
+                        val cx = size.width / 2f
+                        val cy = size.height / 2f
+                        val dx = offset.x - cx
+                        val dy = offset.y - cy
+                        val dist = hypot(dx, dy)
+                        val outerR = minOf(size.width, size.height) / 2f
+                        val innerR = outerR * 0.48f
+                        if (dist < innerR || dist > outerR) {
+                            onSelectSlice(null)
+                            return@detectTapGestures
+                        }
+                        var angle = (atan2(dy.toDouble(), dx.toDouble()) * 180.0 / PI + 90.0)
+                        if (angle < 0) angle += 360.0
+
+                        var cumulative = 0.0
+                        for (slice in slices) {
+                            val sweep = (slice.valueThb / totalValue) * 360.0
+                            if (angle >= cumulative && angle <= cumulative + sweep) {
+                                onSelectSlice(if (selectedSliceId == slice.id) null else slice.id)
+                                break
+                            }
+                            cumulative += sweep
+                        }
+                    }
+                }
+        ) {
+            val strokeRatio = if (isCompact) 0.19f else 0.16f
+            val strokeBase = size.minDimension * strokeRatio
+            val padding = strokeBase / 2f + (if (isCompact) 4.dp else 10.dp).toPx()
+            val diameter = size.minDimension - padding * 2f
+            val topLeft = Offset(
+                (size.width - diameter) / 2f,
+                (size.height - diameter) / 2f
+            )
+            val arcSize = Size(diameter, diameter)
+
+            // Background track
+            drawArc(
+                color = trackColor,
+                startAngle = 0f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = strokeBase)
+            )
+
+            var startAngle = -90f
+            val gapDegrees = if (slices.size > 1) 2.0f else 0f
+
+            slices.forEach { slice ->
+                val rawSweep = ((slice.valueThb / totalValue) * 360.0).toFloat() * sweepProgress
+                val drawSweep = (rawSweep - gapDegrees).coerceAtLeast(1.2f)
+                val isSelected = slice.id == selectedSliceId
+                val alpha = if (selectedSliceId == null || isSelected) 1f else 0.35f
+                val strokeWidth = if (isSelected) strokeBase * 1.22f else strokeBase
+
+                drawArc(
+                    color = slice.color.copy(alpha = alpha),
+                    startAngle = startAngle,
+                    sweepAngle = drawSweep,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
+                )
+                startAngle += rawSweep
+            }
+        }
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = if (isCompact) 18.dp else 32.dp)
+        ) {
+            Text(
+                text = selected?.label ?: centerTitle,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(1.dp))
+            Text(
+                text = if (selected != null) {
+                    FormatUtils.formatPercent(selected.percent, decimals = 1)
+                } else {
+                    centerValueText
+                },
+                style = (if (isCompact) NumericStyleSmall else NumericStyleMedium).copy(
+                    fontWeight = FontWeight.Bold,
+                    color = selected?.color ?: MaterialTheme.colorScheme.onSurface
+                ),
+                maxLines = 1,
+                textAlign = TextAlign.Center
+            )
+            val sub = if (isCompact && selected != null) {
+                FormatUtils.formatThbCompact(selected.valueThb)
+            } else if (!isCompact) {
+                selected?.let { FormatUtils.formatThbCompact(it.valueThb) } ?: centerSubText
+            } else {
+                null
+            }
+            if (!sub.isNullOrBlank()) {
+                Text(
+                    text = sub,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun HorizontalStackedAllocationBar(
     segments: List<Pair<Color, Double>>,
     modifier: Modifier = Modifier
@@ -290,8 +392,8 @@ fun HorizontalStackedAllocationBar(
     Canvas(
         modifier = modifier
             .fillMaxWidth()
-            .height(12.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .height(10.dp)
+            .clip(RoundedCornerShape(5.dp))
             .background(trackColor)
     ) {
         var currentX = 0f

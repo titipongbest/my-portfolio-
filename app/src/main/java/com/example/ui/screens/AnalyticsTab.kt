@@ -122,10 +122,11 @@ fun AnalyticsTab(
             item {
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(22.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    shadowElevation = 2.dp,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(22.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
                 ) {
                     Column(
                         modifier = Modifier.padding(28.dp),
@@ -157,9 +158,9 @@ fun AnalyticsTab(
                             Spacer(modifier = Modifier.height(14.dp))
                             Surface(
                                 color = MaterialTheme.colorScheme.primaryContainer,
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .clip(RoundedCornerShape(10.dp))
                                     .clickable { onManageSectorsClick() }
                                     .testTag("manage_sectors_empty_button")
                             ) {
@@ -192,12 +193,13 @@ fun AnalyticsTab(
                 item {
                     Surface(
                         color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(22.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        shadowElevation = 2.dp,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(22.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
                     ) {
-                        Column(modifier = Modifier.padding(18.dp)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -318,12 +320,13 @@ fun AnalyticsTab(
                 item {
                     Surface(
                         color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(22.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        shadowElevation = 2.dp,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(22.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
                     ) {
-                        Column(modifier = Modifier.padding(18.dp)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Default.PieChart,
@@ -389,12 +392,12 @@ private fun SectorDetailExpandableCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface)
             .border(
-                1.dp,
-                if (isExpanded) accentColor else MaterialTheme.colorScheme.outline,
-                RoundedCornerShape(14.dp)
+                width = if (isExpanded) 1.5.dp else 1.dp,
+                color = if (isExpanded) accentColor else MaterialTheme.colorScheme.outline,
+                shape = RoundedCornerShape(12.dp)
             )
             .clickable { onToggleExpand() }
             .padding(12.dp)
@@ -406,8 +409,9 @@ private fun SectorDetailExpandableCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(12.dp)
-                    .clip(CircleShape)
+                    .width(4.dp)
+                    .height(30.dp)
+                    .clip(RoundedCornerShape(2.dp))
                     .background(accentColor)
             )
             Spacer(modifier = Modifier.width(10.dp))
@@ -435,7 +439,7 @@ private fun SectorDetailExpandableCard(
                 )
                 Text(
                     text = FormatUtils.formatPercent(slice.profitLossPercent, showSign = true),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                     color = pnlColor
                 )
             }

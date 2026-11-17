@@ -307,7 +307,17 @@ class PortfolioEmulatorTest {
             }.getOrDefault(false)
         }
         composeRule.onNodeWithTag("holding_card_PTT").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag("holding_pnl_bar_PTT").assertIsDisplayed()
+        composeRule.onNodeWithTag("holding_pnl_bar_PTT").performScrollTo()
+        runCatching {
+            composeRule.onNodeWithTag("holding_pnl_bar_PTT").assertIsDisplayed()
+        }.onFailure { err ->
+            val cardNode = composeRule.onNodeWithTag("holding_card_PTT").fetchSemanticsNode()
+            val barNode = composeRule.onNodeWithTag("holding_pnl_bar_PTT").fetchSemanticsNode()
+            throw AssertionError(
+                "holding_pnl_bar_PTT not displayed. cardBounds=${cardNode.boundsInRoot}, barBounds=${barNode.boundsInRoot}, cardWindow=${cardNode.boundsInWindow}, barWindow=${barNode.boundsInWindow}",
+                err
+            )
+        }
         composeRule.onNodeWithTag("holding_card_PTT").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             runCatching {

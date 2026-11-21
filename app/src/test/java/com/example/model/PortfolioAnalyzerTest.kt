@@ -316,14 +316,25 @@ class PortfolioAnalyzerTest {
             assertTrue("White-on-heroLight contrast for $cat was too low", contrastRatio(white, heroLight) >= 4.5)
         }
 
+        // Overview mode (null category) also meets WCAG AA contrast
+        val ovOnContainer = com.example.ui.theme.categoryOnContainerColor(null)
+        val ovContainer = com.example.ui.theme.categoryContainerColor(null)
+        val ovAccent = com.example.ui.theme.categoryAccentColor(null)
+        val ovHeroDeep = com.example.ui.theme.categoryHeroDeepColor(null)
+        val ovHeroLight = com.example.ui.theme.categoryHeroLightColor(null)
+        assertTrue("Overview on-container contrast too low", contrastRatio(ovOnContainer, ovContainer) >= 4.5)
+        assertTrue("Overview white-on-accent contrast too low", contrastRatio(white, ovAccent) >= 4.5)
+        assertTrue("Overview white-on-heroDeep contrast too low", contrastRatio(white, ovHeroDeep) >= 4.5)
+        assertTrue("Overview white-on-heroLight contrast too low", contrastRatio(white, ovHeroLight) >= 4.5)
+
         // Thai stock keeps the original Deep Navy institutional color
         assertEquals(com.example.ui.theme.NavyHeaderDeep, com.example.ui.theme.categoryHeroDeepColor(AssetCategory.THAI_STOCK))
         assertEquals(com.example.ui.theme.NavyPrimary, com.example.ui.theme.categoryAccentColor(AssetCategory.THAI_STOCK))
 
-        // Every AssetCategory has a unique, non-repeating theme color set
-        val allCats = AssetCategory.entries
-        assertEquals(allCats.size, allCats.map { com.example.ui.theme.categoryHeroDeepColor(it) }.distinct().size)
-        assertEquals(allCats.size, allCats.map { com.example.ui.theme.categoryAccentColor(it) }.distinct().size)
-        assertEquals(allCats.size, allCats.map { com.example.ui.theme.categoryContainerColor(it) }.distinct().size)
+        // Overview + all 5 AssetCategories each have a unique, non-repeating theme color set
+        val allScopes: List<AssetCategory?> = listOf(null) + AssetCategory.entries
+        assertEquals(allScopes.size, allScopes.map { com.example.ui.theme.categoryHeroDeepColor(it) }.distinct().size)
+        assertEquals(allScopes.size, allScopes.map { com.example.ui.theme.categoryAccentColor(it) }.distinct().size)
+        assertEquals(allScopes.size, allScopes.map { com.example.ui.theme.categoryContainerColor(it) }.distinct().size)
     }
 }

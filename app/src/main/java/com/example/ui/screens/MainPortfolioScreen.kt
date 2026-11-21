@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CurrencyBitcoin
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -47,6 +48,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.TrackChanges
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -157,10 +159,18 @@ private enum class MainTab(
     HOLDINGS("สินทรัพย์", Icons.AutoMirrored.Filled.ListAlt)
 }
 
+private enum class OverviewTabMenu(
+    val labelTh: String,
+    val icon: ImageVector
+) {
+    OVERVIEW("ภาพรวม", Icons.Default.PieChart),
+    PLAN("แผน", Icons.Default.TrackChanges)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainPortfolioScreen(
-    onCategoryChanged: (AssetCategory) -> Unit
+    onCategoryChanged: (AssetCategory?) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope { Dispatchers.Main.immediate }
@@ -187,6 +197,7 @@ fun MainPortfolioScreen(
     val dividendDialogState by viewModel.dividendDialogState.collectAsStateWithLifecycle()
 
     var selectedTab by remember { mutableStateOf(MainTab.DASHBOARD) }
+    var selectedOverviewTab by remember { mutableStateOf(OverviewTabMenu.OVERVIEW) }
     var showAddEditSheet by remember { mutableStateOf(false) }
     var editingHolding by remember { mutableStateOf<Holding?>(null) }
     var showBackupScreen by remember { mutableStateOf(false) }
@@ -218,8 +229,8 @@ fun MainPortfolioScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(uiState.selectedCategory) {
-        onCategoryChanged(uiState.selectedCategory)
+    LaunchedEffect(uiState.activeThemeCategory) {
+        onCategoryChanged(uiState.activeThemeCategory)
     }
 
     var pendingTreeExportName by remember { mutableStateOf("portpulse_backup.json") }
@@ -339,8 +350,8 @@ fun MainPortfolioScreen(
 
     fun triggerExportJson() {
         scope.launch {
-            if (uiState.allHoldings.isEmpty()) {
-                viewModel.notifyMessage("ยังไม่มีข้อมูลสินทรัพย์ในพอร์ตสำหรับส่งออก")
+            if (uiState.allHoldings.isEmpty() && !uiState.portfolioPlan.hasContent) {
+                viewModel.notifyMessage("ยังไม่มีข้อมูลสินทรัพย์หรือแผนการลงทุนสำหรับส่งออก")
                 return@launch
             }
             val res = viewModel.exportPortfolioJson()
@@ -490,14 +501,34 @@ fun MainPortfolioScreen(
         }
     }
 
-    BackHandler(enabled = selectedTab != MainTab.DASHBOARD) {
-        selectedTab = MainTab.DASHBOARD
+    BackHandler(
+        enabled = if (uiState.isOverviewSelected) {
+            selectedOverviewTab != OverviewTabMenu.OVERVIEW
+        } else {
+            selectedTab != MainTab.DASHBOARD
+        }
+    ) {
+        if (uiState.isOverviewSelected) {
+            selectedOverviewTab = OverviewTabMenu.OVERVIEW
+        } else {
+            selectedTab = MainTab.DASHBOARD
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val useRail = maxWidth >= 600.dp
         val portfolioColors = LocalPortfolioColors.current
+        val activeTabLabel = if (uiState.isOverviewSelected) {
+            selectedOverviewTab.labelTh
+        } else {
+            selectedTab.labelTh
+        }
+        val activeScopeLabel = if (uiState.isOverviewSelected) {
+            "Overview"
+        } else {
+            uiState.selectedCategory.shortLabelTh
+        }
 
         Scaffold(
             contentWindowInsets = WindowInsets.safeDrawing,
@@ -534,7 +565,7 @@ fun MainPortfolioScreen(
                                     color = Color.White
                                 )
                                 Text(
-                                    text = "${selectedTab.labelTh} • ${uiState.selectedCategory.shortLabelTh}",
+                                    text = "$activeTabLabel • $activeScopeLabel",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = Color.White.copy(alpha = 0.80f)
                                 )
@@ -580,33 +611,64 @@ fun MainPortfolioScreen(
                             containerColor = MaterialTheme.colorScheme.surface,
                             tonalElevation = 0.dp
                         ) {
-                            MainTab.entries.forEach { tab ->
-                                NavigationBarItem(
-                                    selected = selectedTab == tab,
-                                    onClick = { selectedTab = tab },
-                                    icon = {
-                                        Icon(
-                                            imageVector = tab.icon,
-                                            contentDescription = tab.labelTh
-                                        )
-                                    },
-                                    label = {
-                                        Text(
-                                            text = tab.labelTh,
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontWeight = if (selectedTab == tab) FontWeight.Bold else FontWeight.Medium
+                            if (uiState.isOverviewSelected) {
+                                OverviewTabMenu.entries.forEach { tab ->
+                                    NavigationBarItem(
+                                        selected = selectedOverviewTab == tab,
+                                        onClick = { selectedOverviewTab = tab },
+                                        icon = {
+                                            Icon(
+                                                imageVector = tab.icon,
+                                                contentDescription = tab.labelTh
                                             )
-                                        )
-                                    },
-                                    colors = NavigationBarItemDefaults.colors(
-                                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                                        unselectedIconColor = portfolioColors.mutedSlate,
-                                        unselectedTextColor = portfolioColors.mutedSlate
-                                    ),
-                                    modifier = Modifier.testTag("nav_tab_${tab.name}")
-                                )
+                                        },
+                                        label = {
+                                            Text(
+                                                text = tab.labelTh,
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontWeight = if (selectedOverviewTab == tab) FontWeight.Bold else FontWeight.Medium
+                                                )
+                                            )
+                                        },
+                                        colors = NavigationBarItemDefaults.colors(
+                                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                                            unselectedIconColor = portfolioColors.mutedSlate,
+                                            unselectedTextColor = portfolioColors.mutedSlate
+                                        ),
+                                        modifier = Modifier.testTag("overview_nav_tab_${tab.name}")
+                                    )
+                                }
+                            } else {
+                                MainTab.entries.forEach { tab ->
+                                    NavigationBarItem(
+                                        selected = selectedTab == tab,
+                                        onClick = { selectedTab = tab },
+                                        icon = {
+                                            Icon(
+                                                imageVector = tab.icon,
+                                                contentDescription = tab.labelTh
+                                            )
+                                        },
+                                        label = {
+                                            Text(
+                                                text = tab.labelTh,
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontWeight = if (selectedTab == tab) FontWeight.Bold else FontWeight.Medium
+                                                )
+                                            )
+                                        },
+                                        colors = NavigationBarItemDefaults.colors(
+                                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                                            unselectedIconColor = portfolioColors.mutedSlate,
+                                            unselectedTextColor = portfolioColors.mutedSlate
+                                        ),
+                                        modifier = Modifier.testTag("nav_tab_${tab.name}")
+                                    )
+                                }
                             }
                         }
                     }
@@ -619,10 +681,14 @@ fun MainPortfolioScreen(
                     .padding(innerPadding)
                     .background(MaterialTheme.colorScheme.background)
             ) {
-                // Master Category Selector framed cleanly at the top of the navy hero zone
+                // Master Category Selector framed cleanly at the top of the hero zone
                 TopCategoryDropdownBar(
+                    isOverviewSelected = uiState.isOverviewSelected,
                     selectedCategory = uiState.selectedCategory,
                     allHoldings = uiState.allHoldings,
+                    onSelectOverview = {
+                        viewModel.selectOverview()
+                    },
                     onSelectCategory = viewModel::selectCategory
                 )
 
@@ -636,26 +702,50 @@ fun MainPortfolioScreen(
                             containerColor = MaterialTheme.colorScheme.surface,
                             modifier = Modifier.fillMaxHeight()
                         ) {
-                            MainTab.entries.forEach { tab ->
-                                NavigationRailItem(
-                                    selected = selectedTab == tab,
-                                    onClick = { selectedTab = tab },
-                                    icon = {
-                                        Icon(
-                                            imageVector = tab.icon,
-                                            contentDescription = tab.labelTh
-                                        )
-                                    },
-                                    label = { Text(tab.labelTh) },
-                                    colors = NavigationRailItemDefaults.colors(
-                                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                                        unselectedIconColor = portfolioColors.mutedSlate,
-                                        unselectedTextColor = portfolioColors.mutedSlate
-                                    ),
-                                    modifier = Modifier.testTag("rail_tab_${tab.name}")
-                                )
+                            if (uiState.isOverviewSelected) {
+                                OverviewTabMenu.entries.forEach { tab ->
+                                    NavigationRailItem(
+                                        selected = selectedOverviewTab == tab,
+                                        onClick = { selectedOverviewTab = tab },
+                                        icon = {
+                                            Icon(
+                                                imageVector = tab.icon,
+                                                contentDescription = tab.labelTh
+                                            )
+                                        },
+                                        label = { Text(tab.labelTh) },
+                                        colors = NavigationRailItemDefaults.colors(
+                                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                                            unselectedIconColor = portfolioColors.mutedSlate,
+                                            unselectedTextColor = portfolioColors.mutedSlate
+                                        ),
+                                        modifier = Modifier.testTag("overview_rail_tab_${tab.name}")
+                                    )
+                                }
+                            } else {
+                                MainTab.entries.forEach { tab ->
+                                    NavigationRailItem(
+                                        selected = selectedTab == tab,
+                                        onClick = { selectedTab = tab },
+                                        icon = {
+                                            Icon(
+                                                imageVector = tab.icon,
+                                                contentDescription = tab.labelTh
+                                            )
+                                        },
+                                        label = { Text(tab.labelTh) },
+                                        colors = NavigationRailItemDefaults.colors(
+                                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                                            unselectedIconColor = portfolioColors.mutedSlate,
+                                            unselectedTextColor = portfolioColors.mutedSlate
+                                        ),
+                                        modifier = Modifier.testTag("rail_tab_${tab.name}")
+                                    )
+                                }
                             }
                         }
                     }
@@ -692,6 +782,27 @@ fun MainPortfolioScreen(
                                     )
                                 }
                             }
+                            uiState.isOverviewSelected -> {
+                                when (selectedOverviewTab) {
+                                    OverviewTabMenu.OVERVIEW -> OverviewTab(
+                                        uiState = uiState,
+                                        onRefreshPrices = viewModel::refreshPrices,
+                                        onToggleFilterCategory = viewModel::toggleOverviewFilterCategory,
+                                        onSelectAllFilters = viewModel::selectAllOverviewFilterCategories,
+                                        onOpenCategory = { cat ->
+                                            selectedTab = MainTab.DASHBOARD
+                                            viewModel.selectCategory(cat)
+                                        },
+                                        onOpenPlanTab = {
+                                            selectedOverviewTab = OverviewTabMenu.PLAN
+                                        }
+                                    )
+                                    OverviewTabMenu.PLAN -> OverviewPlanTab(
+                                        uiState = uiState,
+                                        onSavePlan = viewModel::savePortfolioPlan
+                                    )
+                                }
+                            }
                             else -> {
                                 when (selectedTab) {
                                     MainTab.DASHBOARD -> DashboardTab(
@@ -719,22 +830,24 @@ fun MainPortfolioScreen(
                             }
                         }
 
-                        FloatingActionButton(
-                            onClick = {
-                                editingHolding = null
-                                showAddEditSheet = true
-                            },
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = Color.White,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(16.dp)
-                                .testTag("add_holding_fab")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "เพิ่มสินทรัพย์"
-                            )
+                        if (!uiState.isOverviewSelected) {
+                            FloatingActionButton(
+                                onClick = {
+                                    editingHolding = null
+                                    showAddEditSheet = true
+                                },
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = Color.White,
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(16.dp)
+                                    .testTag("add_holding_fab")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "เพิ่มสินทรัพย์"
+                                )
+                            }
                         }
                     }
                 }
@@ -799,6 +912,7 @@ fun MainPortfolioScreen(
     if (showBackupScreen) {
         BackupScreenDialog(
             allHoldings = uiState.allHoldings,
+            hasPortfolioPlan = uiState.portfolioPlan.hasContent,
             autoBackupConfig = uiState.autoBackupConfig,
             actionMessage = uiState.actionMessage,
             onConsumeActionMessage = viewModel::clearActionMessage,
@@ -875,6 +989,7 @@ fun MainPortfolioScreen(
     if (pendingImportPayload != null) {
         val payload = pendingImportPayload!!
         val parsed = payload.holdings
+        val hasImportedPlan = payload.plan?.hasContent == true
         val categoryBreakdown = AssetCategory.entries.mapNotNull { cat ->
             val count = parsed.count { it.assetCategory == cat }
             if (count > 0) "${cat.shortLabelTh} $count" else null
@@ -887,12 +1002,23 @@ fun MainPortfolioScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "พบสินทรัพย์ทั้งหมด ${parsed.size} รายการ ($previewSymbols)",
+                        text = if (parsed.isNotEmpty()) {
+                            "พบสินทรัพย์ทั้งหมด ${parsed.size} รายการ ($previewSymbols)"
+                        } else {
+                            "พบข้อมูลแผนการลงทุนในไฟล์สำรอง"
+                        },
                         style = MaterialTheme.typography.bodyMedium
                     )
                     if (categoryBreakdown.isNotBlank()) {
                         Text(
                             text = "หมวดหมู่ในไฟล์: $categoryBreakdown",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    if (hasImportedPlan) {
+                        Text(
+                            text = "รวมแผนสัดส่วนเป้าหมายและโน้ตการลงทุนในไฟล์นี้ด้วย",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -906,7 +1032,7 @@ fun MainPortfolioScreen(
                     Button(
                         onClick = {
                             pendingImportPayload = null
-                            viewModel.importHoldings(parsed, payload.sectors, ImportMode.MERGE)
+                            viewModel.importHoldings(parsed, payload.sectors, ImportMode.MERGE, payload.plan)
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -917,7 +1043,7 @@ fun MainPortfolioScreen(
                     OutlinedButton(
                         onClick = {
                             pendingImportPayload = null
-                            viewModel.importHoldings(parsed, payload.sectors, ImportMode.REPLACE)
+                            viewModel.importHoldings(parsed, payload.sectors, ImportMode.REPLACE, payload.plan)
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -983,19 +1109,30 @@ fun MainPortfolioScreen(
 
 @Composable
 private fun TopCategoryDropdownBar(
+    isOverviewSelected: Boolean,
     selectedCategory: AssetCategory,
     allHoldings: List<Holding>,
+    onSelectOverview: () -> Unit,
     onSelectCategory: (AssetCategory) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
     val portfolioColors = LocalPortfolioColors.current
 
-    val activeCount = allHoldings.count { it.assetCategory == selectedCategory }
-    val activeLabel = selectedCategory.labelTh
-    val activeIcon = categoryMenuIcon(selectedCategory)
-    val activeOnContainer = categoryOnContainerColor(selectedCategory)
-    val activeContainer = categoryContainerColor(selectedCategory)
+    val activeCount = if (isOverviewSelected) {
+        allHoldings.size
+    } else {
+        allHoldings.count { it.assetCategory == selectedCategory }
+    }
+    val activeLabel = if (isOverviewSelected) {
+        "ภาพรวมทุกสินทรัพย์ (Overview)"
+    } else {
+        selectedCategory.labelTh
+    }
+    val activeIcon = if (isOverviewSelected) Icons.Default.Dashboard else categoryMenuIcon(selectedCategory)
+    val themeCat: AssetCategory? = if (isOverviewSelected) null else selectedCategory
+    val activeOnContainer = categoryOnContainerColor(themeCat)
+    val activeContainer = categoryContainerColor(themeCat)
 
     Box(
         modifier = modifier
@@ -1108,6 +1245,22 @@ private fun TopCategoryDropdownBar(
                 .fillMaxWidth(0.92f)
                 .background(MaterialTheme.colorScheme.surface)
         ) {
+            CategoryDropdownRow(
+                label = "ภาพรวมทุกสินทรัพย์ (Overview)",
+                count = allHoldings.size,
+                category = null,
+                icon = Icons.Default.Dashboard,
+                isSelected = isOverviewSelected,
+                onClick = {
+                    expanded = false
+                    onSelectOverview()
+                },
+                testTag = "top_dropdown_OVERVIEW"
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 4.dp),
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.65f)
+            )
             AssetCategory.entries.forEach { cat ->
                 val count = allHoldings.count { it.assetCategory == cat }
                 CategoryDropdownRow(
@@ -1115,7 +1268,7 @@ private fun TopCategoryDropdownBar(
                     count = count,
                     category = cat,
                     icon = categoryMenuIcon(cat),
-                    isSelected = selectedCategory == cat,
+                    isSelected = !isOverviewSelected && selectedCategory == cat,
                     onClick = {
                         expanded = false
                         onSelectCategory(cat)
@@ -1131,13 +1284,12 @@ private fun TopCategoryDropdownBar(
 private fun CategoryDropdownRow(
     label: String,
     count: Int,
-    category: AssetCategory,
+    category: AssetCategory?,
     icon: ImageVector,
     isSelected: Boolean,
     onClick: () -> Unit,
     testTag: String
 ) {
-    val portfolioColors = LocalPortfolioColors.current
     val itemAccent = categoryAccentColor(category)
     val itemContainer = categoryContainerColor(category)
     val itemOnContainer = categoryOnContainerColor(category)

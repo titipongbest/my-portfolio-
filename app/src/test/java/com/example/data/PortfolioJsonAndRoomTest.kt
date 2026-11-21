@@ -474,4 +474,83 @@ class PortfolioJsonAndRoomTest {
         assertEquals("{\"count\":0}", targetFile.readText(Charsets.UTF_8))
         assertEquals("auto_backup.json", AndroidAutoBackupWriter.resolveDisplayName(context, uri))
     }
+
+    @Test
+    fun portfolioPlan_persistsInSettings_andRoundTripsInBackupJson() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = context.getSharedPreferences("portpulse_settings", Context.MODE_PRIVATE)
+        prefs.edit().clear().commit()
+
+        val store = PortfolioSettingsStore(context)
+        val plan = com.example.model.PortfolioPlan(
+            targetPercents = mapOf(
+                AssetCategory.THAI_STOCK to 40.0,
+                AssetCategory.GLOBAL_STOCK to 30.0,
+                AssetCategory.MUTUAL_FUND to 15.0,
+                AssetCategory.GOLD to 10.0,
+                AssetCategory.CRYPTO to 5.0
+            ),
+            categoryNotes = mapOf(
+                AssetCategory.THAI_STOCK to "เน้นหุ้นปันผลสม่ำเสมอ",
+                AssetCategory.GOLD to "ถือป้องกันความเสี่ยงเงินเฟ้อ"
+            ),
+            overallNote = "DCA ทุกวันที่ 25 ของเดือน รีบาลานซ์ทุกไตรมาส"
+        )
+        store.savePortfolioPlan(plan)
+
+        // Reload in fresh store instance to confirm SharedPreferences persistence
+        val reloadedStore = PortfolioSettingsStore(context)
+        val reloadedPlan = reloadedStore.portfolioPlan.value
+        assertEquals(100.0, reloadedPlan.totalTargetPercent, 0.001)
+        assertEquals(40.0, reloadedPlan.targetPercentFor(AssetCategory.THAI_STOCK), 0.001)
+        assertEquals(5.0, reloadedPlan.targetPercentFor(AssetCategory.CRYPTO), 0.001)
+        assertEquals("เน้นหุ้นปันผลสม่ำเสมอ", reloadedPlan.noteFor(AssetCategory.THAI_STOCK))
+        assertEquals("DCA ทุกวันที่ 25 ของเดือน รีบาลานซ์ทุกไตรมาส", reloadedPlan.overallNote)
+
+        repository.addHolding(
+            Holding(
+                symbol = "PTT",
+                displayName = "บมจ. ปตท.",
+                category = AssetCategory.THAI_STOCK.name,
+                sector = StockSector.ENERGY.name,
+                quantity = 100.0,
+                buyPricePerUnit = 33.0,
+                currency = "THB"
+            )
+        ).getOrThrow()
+
+        val exportedJson = repository.exportToJson(
+            managedSectors = reloadedStore.managedSectors.value,
+            portfolioPlan = reloadedPlan
+        ).getOrThrow()
+        assertTrue(exportedJson.contains("\"plan\""))
+        assertTrue(exportedJson.contains("เน้นหุ้นปันผลสม่ำเสมอ"))
+        assertTrue(exportedJson.contains("DCA ทุกวันที่ 25 ของเดือน"))
+
+        val decoded = PortfolioJsonCodec.decodeWithSectors(exportedJson).getOrThrow()
+        assertEquals(1, decoded.holdings.size)
+        val decodedPlan = decoded.plan
+        assertTrue(decodedPlan != null && decodedPlan.hasContent)
+        assertEquals(40.0, decodedPlan!!.targetPercentFor(AssetCategory.THAI_STOCK), 0.001)
+        assertEquals(30.0, decodedPlan.targetPercentFor(AssetCategory.GLOBAL_STOCK), 0.001)
+        assertEquals("ถือป้องกันความเสี่ยงเงินเฟ้อ", decodedPlan.noteFor(AssetCategory.GOLD))
+        assertEquals("DCA ทุกวันที่ 25 ของเดือน รีบาลานซ์ทุกไตรมาส", decodedPlan.overallNote)
+
+        // Importing on a clean device restores the plan via REPLACE and MERGE
+        prefs.edit().clear().commit()
+        val freshStore = PortfolioSettingsStore(context)
+        assertEquals(0.0, freshStore.portfolioPlan.value.totalTargetPercent, 0.001)
+        freshStore.mergeImportedPlan(decodedPlan, replace = true)
+        assertEquals(100.0, freshStore.portfolioPlan.value.totalTargetPercent, 0.001)
+        assertEquals("DCA ทุกวันที่ 25 ของเดือน รีบาลานซ์ทุกไตรมาส", freshStore.portfolioPlan.value.overallNote)
+
+        // Legacy backup without "plan" decodes cleanly with null plan and preserves existing local plan
+        val legacyJson = """
+            {"version": 1, "holdings": [{"symbol": "AOT", "category": "THAI_STOCK", "quantity": 10, "buyPricePerUnit": 60}]}
+        """.trimIndent()
+        val legacyPayload = PortfolioJsonCodec.decodeWithSectors(legacyJson).getOrThrow()
+        assertNull(legacyPayload.plan)
+        freshStore.mergeImportedPlan(legacyPayload.plan, replace = true)
+        assertEquals(100.0, freshStore.portfolioPlan.value.totalTargetPercent, 0.001)
+    }
 }

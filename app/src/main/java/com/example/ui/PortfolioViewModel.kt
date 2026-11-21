@@ -20,6 +20,7 @@ import com.example.model.AssetCategory
 import com.example.model.Holding
 import com.example.model.ManagedSector
 import com.example.model.PortfolioAnalyzer
+import com.example.model.PortfolioPlan
 import com.example.model.PortfolioSummary
 import com.example.model.StockSector
 import com.example.ui.screens.DividendUiState
@@ -47,16 +48,24 @@ data class PortfolioUiState(
     val errorMessage: String? = null,
     val allHoldings: List<Holding> = emptyList(),
     val selectedCategory: AssetCategory = AssetCategory.THAI_STOCK,
+    val isOverviewSelected: Boolean = false,
+    val overviewFilterCategories: Set<AssetCategory> = AssetCategory.entries.toSet(),
     val categorySummary: PortfolioSummary = PortfolioAnalyzer.analyze(emptyList(), MarketSnapshot()),
+    val overviewSummary: PortfolioSummary = PortfolioAnalyzer.analyze(emptyList(), MarketSnapshot()),
+    val fullPortfolioSummary: PortfolioSummary = PortfolioAnalyzer.analyze(emptyList(), MarketSnapshot()),
     val filteredHoldings: List<AnalyzedHolding> = emptyList(),
     val managedSectors: List<ManagedSector> = StockSector.defaultManagedSectors(),
+    val portfolioPlan: PortfolioPlan = PortfolioPlan(),
     val autoBackupConfig: AutoBackupConfig = AutoBackupConfig(),
     val securityConfig: AppSecurityConfig = AppSecurityConfig(),
     val isRefreshingPrices: Boolean = false,
     val priceStatusMessage: String? = null,
     val actionMessage: String? = null,
     val isSaving: Boolean = false
-)
+) {
+    val activeThemeCategory: AssetCategory?
+        get() = if (isOverviewSelected) null else selectedCategory
+}
 
 class PortfolioViewModel(
     private val repository: PortfolioRepository,
@@ -67,6 +76,8 @@ class PortfolioViewModel(
 
     private val _marketSnapshot = MutableStateFlow(MarketSnapshot())
     private val _selectedCategory = MutableStateFlow(AssetCategory.THAI_STOCK)
+    private val _isOverviewSelected = MutableStateFlow(false)
+    private val _overviewFilterCategories = MutableStateFlow(AssetCategory.entries.toSet())
     private val _isRefreshingPrices = MutableStateFlow(false)
     private val _priceStatusMessage = MutableStateFlow<String?>(null)
     private val _actionMessage = MutableStateFlow<String?>(null)
@@ -96,44 +107,70 @@ class PortfolioViewModel(
             initialValue = HoldingsLoadState.Loading
         )
 
-    private data class RefreshControls(
+    private data class ScopeSelection(
         val category: AssetCategory,
+        val isOverview: Boolean,
+        val overviewFilters: Set<AssetCategory>
+    )
+
+    private data class RefreshControls(
+        val scope: ScopeSelection,
         val isRefreshing: Boolean,
         val priceStatus: String?,
         val actionMsg: String?,
         val isSaving: Boolean
     )
 
-    private val controlsFlow = combine(
+    private data class SettingsBundle(
+        val sectors: List<ManagedSector>,
+        val backupConfig: AutoBackupConfig,
+        val securityConfig: AppSecurityConfig,
+        val plan: PortfolioPlan
+    )
+
+    private val scopeSelectionFlow = combine(
         _selectedCategory,
+        _isOverviewSelected,
+        _overviewFilterCategories
+    ) { category, isOverview, filters ->
+        ScopeSelection(category, isOverview, filters)
+    }
+
+    private val controlsFlow = combine(
+        scopeSelectionFlow,
         _isRefreshingPrices,
         _priceStatusMessage,
         _actionMessage,
         _isSaving
-    ) { category, isRefreshing, priceStatus, actionMsg, isSaving ->
-        RefreshControls(category, isRefreshing, priceStatus, actionMsg, isSaving)
+    ) { scope, isRefreshing, priceStatus, actionMsg, isSaving ->
+        RefreshControls(scope, isRefreshing, priceStatus, actionMsg, isSaving)
     }
 
-    private val settingsPairFlow = combine(
+    private val settingsBundleFlow = combine(
         settingsStore.managedSectors,
         settingsStore.autoBackupConfig,
-        settingsStore.securityConfig
-    ) { sectors, backupConfig, securityConfig ->
-        Triple(sectors, backupConfig, securityConfig)
+        settingsStore.securityConfig,
+        settingsStore.portfolioPlan
+    ) { sectors, backupConfig, securityConfig, plan ->
+        SettingsBundle(sectors, backupConfig, securityConfig, plan)
     }
 
     val uiState: StateFlow<PortfolioUiState> = combine(
         holdingsState,
         _marketSnapshot,
-        settingsPairFlow,
+        settingsBundleFlow,
         controlsFlow
-    ) { loadState, snapshot, settingsTriple, controls ->
-        val (sectors, backupConfig, securityConfig) = settingsTriple
+    ) { loadState, snapshot, settings, controls ->
+        val (sectors, backupConfig, securityConfig, plan) = settings
+        val scope = controls.scope
         when (loadState) {
             HoldingsLoadState.Loading -> PortfolioUiState(
                 isLoading = true,
-                selectedCategory = controls.category,
+                selectedCategory = scope.category,
+                isOverviewSelected = scope.isOverview,
+                overviewFilterCategories = scope.overviewFilters,
                 managedSectors = sectors,
+                portfolioPlan = plan,
                 autoBackupConfig = backupConfig,
                 securityConfig = securityConfig,
                 isRefreshingPrices = controls.isRefreshing,
@@ -142,8 +179,11 @@ class PortfolioViewModel(
             is HoldingsLoadState.Error -> PortfolioUiState(
                 isLoading = false,
                 errorMessage = loadState.message,
-                selectedCategory = controls.category,
+                selectedCategory = scope.category,
+                isOverviewSelected = scope.isOverview,
+                overviewFilterCategories = scope.overviewFilters,
                 managedSectors = sectors,
+                portfolioPlan = plan,
                 autoBackupConfig = backupConfig,
                 securityConfig = securityConfig,
                 isRefreshingPrices = controls.isRefreshing,
@@ -151,16 +191,30 @@ class PortfolioViewModel(
             )
             is HoldingsLoadState.Success -> {
                 val categoryHoldings = loadState.holdings.filter {
-                    it.assetCategory == controls.category
+                    it.assetCategory == scope.category
                 }
                 val categorySummary = PortfolioAnalyzer.analyze(categoryHoldings, snapshot, sectors)
+                val fullPortfolioSummary = PortfolioAnalyzer.analyze(loadState.holdings, snapshot, sectors)
+                val overviewSummary = if (scope.overviewFilters.size == AssetCategory.entries.size) {
+                    fullPortfolioSummary
+                } else {
+                    val filteredForOverview = loadState.holdings.filter {
+                        it.assetCategory in scope.overviewFilters
+                    }
+                    PortfolioAnalyzer.analyze(filteredForOverview, snapshot, sectors)
+                }
                 PortfolioUiState(
                     isLoading = false,
                     allHoldings = loadState.holdings,
-                    selectedCategory = controls.category,
+                    selectedCategory = scope.category,
+                    isOverviewSelected = scope.isOverview,
+                    overviewFilterCategories = scope.overviewFilters,
                     categorySummary = categorySummary,
+                    overviewSummary = overviewSummary,
+                    fullPortfolioSummary = fullPortfolioSummary,
                     filteredHoldings = categorySummary.analyzedHoldings,
                     managedSectors = sectors,
+                    portfolioPlan = plan,
                     autoBackupConfig = backupConfig,
                     securityConfig = securityConfig,
                     isRefreshingPrices = controls.isRefreshing,
@@ -176,6 +230,7 @@ class PortfolioViewModel(
         initialValue = PortfolioUiState(
             isLoading = true,
             managedSectors = settingsStore.managedSectors.value,
+            portfolioPlan = settingsStore.portfolioPlan.value,
             autoBackupConfig = settingsStore.autoBackupConfig.value,
             securityConfig = settingsStore.securityConfig.value
         )
@@ -197,32 +252,47 @@ class PortfolioViewModel(
             }
         }
 
-        // Observe holdings & managed sectors to trigger automatic file backup on any data update
+        // Observe holdings, managed sectors, and portfolio plan to trigger automatic file backup on any update
         viewModelScope.launch {
-            combine(holdingsState, settingsStore.managedSectors) { state, sectors ->
-                state to sectors
-            }.collect { (state, sectors) ->
+            combine(
+                holdingsState,
+                settingsStore.managedSectors,
+                settingsStore.portfolioPlan
+            ) { state, sectors, plan ->
+                Triple(state, sectors, plan)
+            }.collect { (state, sectors, plan) ->
                 if (state is HoldingsLoadState.Success) {
-                    val dataSig = buildDataSignature(state.holdings, sectors)
+                    val dataSig = buildDataSignature(state.holdings, sectors, plan)
                     val previousSig = lastDataSignature
                     lastDataSignature = dataSig
                     if (previousSig != null && previousSig != dataSig) {
-                        scheduleAutoBackup(state.holdings, sectors)
+                        scheduleAutoBackup(state.holdings, sectors, plan)
                     }
                 }
             }
         }
     }
 
-    private fun buildDataSignature(holdings: List<Holding>, sectors: List<ManagedSector>): String {
+    private fun buildDataSignature(
+        holdings: List<Holding>,
+        sectors: List<ManagedSector>,
+        plan: PortfolioPlan
+    ): String {
         val hSig = holdings.joinToString(";") { h ->
             "${h.id}|${h.symbol}|${h.displayName}|${h.category}|${h.sector}|${h.quantity}|${h.buyPricePerUnit}|${h.currency}|${h.manualCurrentPrice}|${h.updatedAtMillis}"
         }
         val sSig = sectors.joinToString(",") { "${it.id}:${it.label}" }
-        return "$hSig#$sSig"
+        val pSig = AssetCategory.entries.joinToString(",") { cat ->
+            "${cat.name}=${plan.targetPercentFor(cat)}:${plan.noteFor(cat)}"
+        } + "|${plan.overallNote}"
+        return "$hSig#$sSig#$pSig"
     }
 
-    private fun scheduleAutoBackup(holdings: List<Holding>, sectors: List<ManagedSector>) {
+    private fun scheduleAutoBackup(
+        holdings: List<Holding>,
+        sectors: List<ManagedSector>,
+        plan: PortfolioPlan
+    ) {
         val config = settingsStore.autoBackupConfig.value
         val writer = autoBackupWriter ?: return
         val uri = config.uriString ?: return
@@ -232,7 +302,7 @@ class PortfolioViewModel(
         autoBackupJob = viewModelScope.launch {
             delay(250L)
             val res = runCatching {
-                val json = PortfolioJsonCodec.encode(holdings, sectors)
+                val json = PortfolioJsonCodec.encode(holdings, sectors, plan)
                 writer.writeJsonToUri(uri, json).getOrThrow()
             }
             if (res.isSuccess) {
@@ -248,8 +318,35 @@ class PortfolioViewModel(
         }
     }
 
+    fun selectOverview() {
+        _isOverviewSelected.value = true
+    }
+
     fun selectCategory(category: AssetCategory) {
+        _isOverviewSelected.value = false
         _selectedCategory.value = category
+    }
+
+    fun toggleOverviewFilterCategory(category: AssetCategory) {
+        val current = _overviewFilterCategories.value
+        if (category in current) {
+            if (current.size <= 1) {
+                _actionMessage.value = "ต้องเลือกอย่างน้อย 1 ชนิดสินทรัพย์ในการกรอง"
+                return
+            }
+            _overviewFilterCategories.value = current - category
+        } else {
+            _overviewFilterCategories.value = current + category
+        }
+    }
+
+    fun selectAllOverviewFilterCategories() {
+        _overviewFilterCategories.value = AssetCategory.entries.toSet()
+    }
+
+    fun savePortfolioPlan(plan: PortfolioPlan) {
+        settingsStore.savePortfolioPlan(plan)
+        _actionMessage.value = "บันทึกแผนการลงทุนเรียบร้อยแล้ว"
     }
 
     fun refreshPrices() {
@@ -429,7 +526,8 @@ class PortfolioViewModel(
             val res = runCatching {
                 val items = repository.getHoldingsOnce()
                 val sectors = settingsStore.managedSectors.value
-                val json = PortfolioJsonCodec.encode(items, sectors)
+                val plan = settingsStore.portfolioPlan.value
+                val json = PortfolioJsonCodec.encode(items, sectors, plan)
                 writer.writeJsonToUri(uriString, json).getOrThrow()
             }
             if (res.isSuccess) {
@@ -468,7 +566,8 @@ class PortfolioViewModel(
             val res = runCatching {
                 val items = repository.getHoldingsOnce()
                 val sectors = settingsStore.managedSectors.value
-                val json = PortfolioJsonCodec.encode(items, sectors)
+                val plan = settingsStore.portfolioPlan.value
+                val json = PortfolioJsonCodec.encode(items, sectors, plan)
                 writer.writeJsonToUri(uri, json).getOrThrow()
             }
             if (res.isSuccess) {
@@ -489,13 +588,17 @@ class PortfolioViewModel(
     }
 
     suspend fun exportPortfolioJson(): Result<String> {
-        return repository.exportToJson(settingsStore.managedSectors.value)
+        return repository.exportToJson(
+            managedSectors = settingsStore.managedSectors.value,
+            portfolioPlan = settingsStore.portfolioPlan.value
+        )
     }
 
     fun importHoldings(
         holdings: List<Holding>,
         importedSectors: List<ManagedSector>,
-        mode: ImportMode
+        mode: ImportMode,
+        importedPlan: PortfolioPlan? = null
     ) {
         viewModelScope.launch {
             _isSaving.value = true
@@ -503,13 +606,21 @@ class PortfolioViewModel(
             settingsStore.ensureSectorsPresent(
                 holdings.filter { it.assetCategory.isStock }.map { it.sector }
             )
-            val result = repository.importHoldings(holdings, mode)
+            val result = if (holdings.isEmpty() && mode == ImportMode.MERGE) {
+                Result.success(0)
+            } else {
+                repository.importHoldings(holdings, mode)
+            }
+            if (result.isSuccess && importedPlan != null) {
+                settingsStore.mergeImportedPlan(importedPlan, replace = mode == ImportMode.REPLACE)
+            }
             _isSaving.value = false
             if (result.isSuccess) {
                 val count = result.getOrDefault(holdings.size)
+                val planSuffix = if (importedPlan?.hasContent == true) " พร้อมแผนการลงทุน" else ""
                 _actionMessage.value = when (mode) {
-                    ImportMode.MERGE -> "นำเข้าและเพิ่ม $count รายการเข้าพอร์ตแล้ว"
-                    ImportMode.REPLACE -> "นำเข้าและแทนที่พอร์ตด้วย $count รายการแล้ว"
+                    ImportMode.MERGE -> "นำเข้าและเพิ่ม $count รายการเข้าพอร์ตแล้ว$planSuffix"
+                    ImportMode.REPLACE -> "นำเข้าและแทนที่พอร์ตด้วย $count รายการแล้ว$planSuffix"
                 }
             } else {
                 _actionMessage.value = "นำเข้าข้อมูลไม่สำเร็จ: ${result.exceptionOrNull()?.localizedMessage ?: "เกิดข้อผิดพลาด"}"

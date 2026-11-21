@@ -75,3 +75,54 @@ data class Holding(
             ?: StockSector.OTHER.shortLabelTh
     }
 }
+
+data class PortfolioPlan(
+    val targetPercents: Map<AssetCategory, Double> = emptyMap(),
+    val categoryNotes: Map<AssetCategory, String> = emptyMap(),
+    val overallNote: String = "",
+    val updatedAtMillis: Long? = null
+) {
+    fun targetPercentFor(category: AssetCategory): Double =
+        targetPercents[category]?.takeIf { it.isFinite() && it >= 0.0 }?.coerceIn(0.0, 100.0) ?: 0.0
+
+    fun noteFor(category: AssetCategory): String =
+        categoryNotes[category].orEmpty()
+
+    val totalTargetPercent: Double
+        get() = AssetCategory.entries.sumOf { targetPercentFor(it) }
+
+    val hasContent: Boolean
+        get() = AssetCategory.entries.any { targetPercentFor(it) > 0.0 || noteFor(it).isNotBlank() } ||
+            overallNote.isNotBlank()
+
+    fun sanitized(timestampMillis: Long? = updatedAtMillis): PortfolioPlan {
+        val cleanTargets = buildMap {
+            for (cat in AssetCategory.entries) {
+                val pct = targetPercentFor(cat)
+                if (pct > 0.0) {
+                    put(cat, Math.round(pct * 100.0) / 100.0)
+                }
+            }
+        }
+        val cleanNotes = buildMap {
+            for (cat in AssetCategory.entries) {
+                val trimmed = noteFor(cat).trim().take(MAX_CATEGORY_NOTE_CHARS)
+                if (trimmed.isNotEmpty()) {
+                    put(cat, trimmed)
+                }
+            }
+        }
+        val cleanOverall = overallNote.trim().take(MAX_OVERALL_NOTE_CHARS)
+        return PortfolioPlan(
+            targetPercents = cleanTargets,
+            categoryNotes = cleanNotes,
+            overallNote = cleanOverall,
+            updatedAtMillis = timestampMillis
+        )
+    }
+
+    companion object {
+        const val MAX_CATEGORY_NOTE_CHARS = 500
+        const val MAX_OVERALL_NOTE_CHARS = 2000
+    }
+}

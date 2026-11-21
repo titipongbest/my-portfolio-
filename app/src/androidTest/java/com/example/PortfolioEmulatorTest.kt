@@ -17,6 +17,8 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.core.app.ActivityScenario
@@ -101,6 +103,21 @@ class PortfolioEmulatorTest {
         )
         assertTextNotTruncated(
             composeRule.onNode(hasText("เปลี่ยน") and inHeader, useUnmergedTree = true)
+        )
+
+        // Verify Overview option renders completely without truncation
+        composeRule.onNodeWithTag("top_category_dropdown").performClick()
+        composeRule.waitForIdle()
+        assertTextNotTruncated(
+            composeRule.onNode(
+                hasText("ภาพรวมทุกสินทรัพย์ (Overview)") and hasAnyAncestor(hasTestTag("top_dropdown_OVERVIEW")),
+                useUnmergedTree = true
+            )
+        )
+        composeRule.onNodeWithTag("top_dropdown_OVERVIEW").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+        assertTextNotTruncated(
+            composeRule.onNode(hasText("ภาพรวมทุกสินทรัพย์ (Overview)") and inHeader, useUnmergedTree = true)
         )
 
         AssetCategory.entries.forEach { category ->
@@ -320,6 +337,163 @@ class PortfolioEmulatorTest {
         composeRule.onNode(hasText("มูลค่าทุนรวม"), useUnmergedTree = true)
             .performScrollTo()
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun overviewMode_filtersCategories_expandsDetails_savesPlanAndBackupsInJson() {
+        val testDir = File(appContext.cacheDir, "emulator_overview_plan_test").apply { mkdirs() }
+        val importFile = File(testDir, "multi_asset_seed.json").apply {
+            writeText(
+                """
+                {
+                  "version": 2,
+                  "holdings": [
+                    {
+                      "symbol": "PTT",
+                      "displayName": "บมจ. ปตท.",
+                      "category": "THAI_STOCK",
+                      "sector": "ENERGY",
+                      "quantity": 100.0,
+                      "buyPricePerUnit": 33.0,
+                      "currency": "THB"
+                    },
+                    {
+                      "symbol": "BTC",
+                      "displayName": "Bitcoin",
+                      "category": "CRYPTO",
+                      "sector": "NONE",
+                      "quantity": 0.1,
+                      "buyPricePerUnit": 2500000.0,
+                      "currency": "THB"
+                    }
+                  ]
+                }
+                """.trimIndent(),
+                Charsets.UTF_8
+            )
+        }
+        val exportedWithPlanFile = File(testDir, "exported_with_plan.json").apply { if (exists()) delete() }
+
+        // Seed multi-category portfolio via Backup import
+        Intents.intending(IntentMatchers.hasAction(Intent.ACTION_OPEN_DOCUMENT))
+            .respondWith(
+                Instrumentation.ActivityResult(
+                    Activity.RESULT_OK,
+                    Intent().setData(Uri.fromFile(importFile))
+                )
+            )
+        composeRule.onNodeWithTag("backup_screen_button").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("backup_screen_import_button").performScrollTo().assertIsDisplayed()
+        performFingerTap(composeRule.onNodeWithTag("backup_screen_import_button"))
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                composeRule.onNodeWithTag("import_replace_button").assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+        }
+        composeRule.onNodeWithTag("import_replace_button").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                composeRule.onNode(hasText("รวมทุกหมวดหมู่ทั้งหมด 2 รายการในไฟล์เดียว")).assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+        }
+        performFingerTap(composeRule.onNodeWithTag("backup_back_button"))
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                composeRule.onNodeWithTag("top_category_dropdown").assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+        }
+
+        // 1) Switch to Overview mode from master category selector
+        composeRule.onNodeWithTag("top_category_dropdown").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("top_dropdown_OVERVIEW").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+
+        // 2) Verify bottom navigation shows ONLY ภาพรวม and แผน (no Analytics/Holdings tabs or FAB)
+        composeRule.onNodeWithTag("overview_nav_tab_OVERVIEW").assertIsDisplayed()
+        composeRule.onNodeWithTag("overview_nav_tab_PLAN").assertIsDisplayed()
+        composeRule.onNodeWithTag("nav_tab_ANALYTICS").assertDoesNotExist()
+        composeRule.onNodeWithTag("nav_tab_HOLDINGS").assertDoesNotExist()
+        composeRule.onNodeWithTag("add_holding_fab").assertDoesNotExist()
+
+        // 3) Expand Thai Stock category card to inspect asset details (PTT)
+        composeRule.onNodeWithTag("overview_lazy_column")
+            .performScrollToNode(hasTestTag("overview_category_card_THAI_STOCK"))
+        composeRule.onNodeWithTag("overview_category_card_THAI_STOCK").assertIsDisplayed().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                composeRule.onNodeWithTag("overview_holding_row_PTT", useUnmergedTree = true).fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+        }
+        composeRule.onNodeWithTag("overview_holding_row_PTT", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+
+        // 4) Toggle filter chip to exclude CRYPTO and verify CRYPTO category card is filtered out
+        composeRule.onNodeWithTag("overview_lazy_column")
+            .performScrollToNode(hasTestTag("overview_filter_CRYPTO"))
+        composeRule.onNodeWithTag("overview_filter_CRYPTO").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("overview_category_card_CRYPTO").assertDoesNotExist()
+        composeRule.onNodeWithTag("overview_filter_all").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+
+        // 5) Switch to Plan tab (แผน), enter target % + category note + overall note, and save
+        composeRule.onNodeWithTag("overview_nav_tab_PLAN").performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("overview_plan_lazy_column")
+            .performScrollToNode(hasTestTag("plan_category_card_THAI_STOCK"))
+        composeRule.onNodeWithTag("plan_target_input_THAI_STOCK").performScrollTo().performTextReplacement("60")
+        composeRule.onNodeWithTag("plan_category_note_THAI_STOCK").performScrollTo().performTextReplacement("เน้นหุ้นปันผล")
+
+        composeRule.onNodeWithTag("overview_plan_lazy_column")
+            .performScrollToNode(hasTestTag("plan_category_card_CRYPTO"))
+        composeRule.onNodeWithTag("plan_target_input_CRYPTO").performScrollTo().performTextReplacement("40")
+
+        composeRule.onNodeWithTag("overview_plan_lazy_column")
+            .performScrollToNode(hasTestTag("plan_overall_note_input"))
+        composeRule.onNodeWithTag("plan_overall_note_input").performScrollTo().performTextReplacement("DCA ทุกเดือน")
+
+        composeRule.onNodeWithTag("overview_plan_lazy_column")
+            .performScrollToNode(hasTestTag("plan_save_bottom_button"))
+        composeRule.onNodeWithTag("plan_save_bottom_button").performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        // 6) Export JSON backup and confirm plan targets & notes are included in backup file
+        Intents.intending(
+            allOf(
+                IntentMatchers.hasAction(Intent.ACTION_CREATE_DOCUMENT),
+                IntentMatchers.hasType("application/json")
+            )
+        ).respondWith(
+            Instrumentation.ActivityResult(
+                Activity.RESULT_OK,
+                Intent().setData(Uri.fromFile(exportedWithPlanFile))
+            )
+        )
+        composeRule.onNodeWithTag("backup_screen_button").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("backup_screen_export_button").performScrollTo().assertIsDisplayed()
+        composeRule.waitForIdle()
+        performFingerTap(composeRule.onNodeWithTag("backup_screen_export_button"))
+        waitUntilCondition(5_000) { exportedWithPlanFile.exists() && exportedWithPlanFile.length() > 10 }
+
+        val exportedJson = exportedWithPlanFile.readText(Charsets.UTF_8)
+        val rootObj = org.json.JSONObject(exportedJson)
+        assertTrue("Expected backup JSON to include plan section", rootObj.has("plan"))
+        val planObj = rootObj.getJSONObject("plan")
+        val targetsObj = planObj.getJSONObject("targetPercents")
+        val notesObj = planObj.getJSONObject("categoryNotes")
+        assertTrue("Expected Thai stock target == 60", kotlin.math.abs(targetsObj.getDouble("THAI_STOCK") - 60.0) < 0.01)
+        assertTrue("Expected Crypto target == 40", kotlin.math.abs(targetsObj.getDouble("CRYPTO") - 40.0) < 0.01)
+        assertTrue("Expected category note in backup JSON", notesObj.getString("THAI_STOCK") == "เน้นหุ้นปันผล")
+        assertTrue("Expected overall note in backup JSON", planObj.getString("overallNote") == "DCA ทุกเดือน")
     }
 
     private fun performFingerTap(nodeInteraction: SemanticsNodeInteraction) {

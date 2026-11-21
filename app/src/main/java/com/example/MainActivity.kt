@@ -22,7 +22,7 @@ class MainActivity : FragmentActivity() {
             navigationBarStyle = SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT)
         )
         setContent {
-            var activeCategoryTheme by remember { mutableStateOf(AssetCategory.THAI_STOCK) }
+            var activeCategoryTheme by remember { mutableStateOf<AssetCategory?>(AssetCategory.THAI_STOCK) }
             PortPulseTheme(selectedCategory = activeCategoryTheme) {
                 MainPortfolioScreen(
                     onCategoryChanged = { activeCategoryTheme = it }

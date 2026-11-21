@@ -72,6 +72,7 @@ import com.example.ui.theme.categoryOnContainerColor
 @Composable
 fun BackupScreenDialog(
     allHoldings: List<Holding>,
+    hasPortfolioPlan: Boolean = false,
     autoBackupConfig: AutoBackupConfig,
     actionMessage: String?,
     onConsumeActionMessage: () -> Unit,
@@ -370,7 +371,7 @@ fun BackupScreenDialog(
                     BackupActionCard(
                         icon = Icons.Default.Download,
                         title = "ส่งออกข้อมูลรวมไฟล์เดียว (Export JSON)",
-                        subtitle = "เลือกตำแหน่งบันทึกผ่าน File Explorer ของ Android รวมสินทรัพย์ทุกหมวดหมู่และกลุ่มอุตสาหกรรมไว้ในไฟล์ .json เดียว",
+                        subtitle = "เลือกตำแหน่งบันทึกผ่าน File Explorer ของ Android รวมสินทรัพย์ทุกหมวดหมู่ กลุ่มอุตสาหกรรม และแผน/โน้ตการลงทุนไว้ในไฟล์ .json เดียว",
                         buttonLabel = "ส่งออกไฟล์ JSON (File Explorer)",
                         buttonTag = "backup_screen_export_button",
                         isPrimaryButton = false,
@@ -394,6 +395,19 @@ fun BackupScreenDialog(
                                         )
                                     }
                                 }
+                                if (hasPortfolioPlan) {
+                                    Surface(
+                                        color = categoryContainerColor(null),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text(
+                                            text = "แผนและโน้ต: รวมในไฟล์",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = categoryOnContainerColor(null),
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                     )
@@ -404,7 +418,7 @@ fun BackupScreenDialog(
                     BackupActionCard(
                         icon = Icons.Default.UploadFile,
                         title = "นำเข้าข้อมูลจากไฟล์เดียว (Import JSON)",
-                        subtitle = "เปิด File Explorer ของ Android เพื่อเลือกไฟล์สำรอง .json และนำเข้าสินทรัพย์ทุกหมวดหมู่",
+                        subtitle = "เปิด File Explorer ของ Android เพื่อเลือกไฟล์สำรอง .json และนำเข้าสินทรัพย์ทุกหมวดหมู่พร้อมแผนและโน้ต",
                         buttonLabel = "นำเข้าไฟล์ JSON (File Explorer)",
                         buttonTag = "backup_screen_import_button",
                         isPrimaryButton = false,

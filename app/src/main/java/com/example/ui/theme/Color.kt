@@ -65,6 +65,13 @@ val FundGreenHighlight = Color(0xFF15803D)
 val PureWhiteSurface = Color(0xFFFFFFFF)
 
 // Institutional Wealth / Banking Palette (inspired by Streaming Fund+ aesthetic)
+// 0. Portfolio Overview (Executive Obsidian Slate - distinct from all 5 asset categories)
+val OverviewSlateDeep = Color(0xFF1E293B)
+val OverviewSlatePrimary = Color(0xFF334155)
+val OverviewSlateBright = Color(0xFF475569)
+val OverviewSlateContainer = Color(0xFFE2E8F0)
+val OverviewSlateOnContainer = Color(0xFF0F172A)
+
 // 1. Thai Stocks (สีเดิม: Deep Institutional Navy)
 val NavyHeaderDeep = Color(0xFF0F2B4F)
 val NavyPrimary = Color(0xFF194276)
@@ -132,7 +139,8 @@ val ChartPalette = listOf(
 )
 
 fun categoryHeroDeepColor(category: AssetCategory?): Color = when (category) {
-    null, AssetCategory.THAI_STOCK -> NavyHeaderDeep
+    null -> OverviewSlateDeep
+    AssetCategory.THAI_STOCK -> NavyHeaderDeep
     AssetCategory.GLOBAL_STOCK -> GlobalIndigoDeep
     AssetCategory.MUTUAL_FUND -> FundEmeraldDeep
     AssetCategory.GOLD -> GoldBronzeDeep
@@ -140,7 +148,8 @@ fun categoryHeroDeepColor(category: AssetCategory?): Color = when (category) {
 }
 
 fun categoryHeroLightColor(category: AssetCategory?): Color = when (category) {
-    null, AssetCategory.THAI_STOCK -> NavyPrimary
+    null -> OverviewSlatePrimary
+    AssetCategory.THAI_STOCK -> NavyPrimary
     AssetCategory.GLOBAL_STOCK -> GlobalIndigoPrimary
     AssetCategory.MUTUAL_FUND -> FundEmeraldPrimary
     AssetCategory.GOLD -> GoldBronzePrimary
@@ -148,7 +157,8 @@ fun categoryHeroLightColor(category: AssetCategory?): Color = when (category) {
 }
 
 fun categorySecondaryColor(category: AssetCategory?): Color = when (category) {
-    null, AssetCategory.THAI_STOCK -> NavyBright
+    null -> OverviewSlateBright
+    AssetCategory.THAI_STOCK -> NavyBright
     AssetCategory.GLOBAL_STOCK -> GlobalIndigoBright
     AssetCategory.MUTUAL_FUND -> FundEmeraldBright
     AssetCategory.GOLD -> GoldBronzeBright
@@ -156,7 +166,7 @@ fun categorySecondaryColor(category: AssetCategory?): Color = when (category) {
 }
 
 fun categoryAccentColor(category: AssetCategory?): Color = when (category) {
-    null -> GoldAccentTextLight
+    null -> OverviewSlatePrimary
     AssetCategory.THAI_STOCK -> NavyPrimary
     AssetCategory.GLOBAL_STOCK -> GlobalIndigoPrimary
     AssetCategory.MUTUAL_FUND -> FundEmeraldPrimary
@@ -165,7 +175,7 @@ fun categoryAccentColor(category: AssetCategory?): Color = when (category) {
 }
 
 fun categoryContainerColor(category: AssetCategory?): Color = when (category) {
-    null -> SoftYellowContainer
+    null -> OverviewSlateContainer
     AssetCategory.THAI_STOCK -> NavyContainer
     AssetCategory.GLOBAL_STOCK -> GlobalIndigoContainer
     AssetCategory.MUTUAL_FUND -> FundEmeraldContainer
@@ -174,7 +184,7 @@ fun categoryContainerColor(category: AssetCategory?): Color = when (category) {
 }
 
 fun categoryOnContainerColor(category: AssetCategory?): Color = when (category) {
-    null -> DeepAmberOnContainer
+    null -> OverviewSlateOnContainer
     AssetCategory.THAI_STOCK -> NavyOnContainer
     AssetCategory.GLOBAL_STOCK -> GlobalIndigoOnContainer
     AssetCategory.MUTUAL_FUND -> FundEmeraldOnContainer

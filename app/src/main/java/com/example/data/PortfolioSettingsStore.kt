@@ -3,7 +3,9 @@ package com.example.data
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Base64
+import com.example.model.AssetCategory
 import com.example.model.ManagedSector
+import com.example.model.PortfolioPlan
 import com.example.model.StockSector
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -48,6 +50,9 @@ class PortfolioSettingsStore(context: Context) {
 
     private val _securityConfig = MutableStateFlow(loadSecurityConfig())
     val securityConfig: StateFlow<AppSecurityConfig> = _securityConfig.asStateFlow()
+
+    private val _portfolioPlan = MutableStateFlow(loadPlanFromPrefs())
+    val portfolioPlan: StateFlow<PortfolioPlan> = _portfolioPlan.asStateFlow()
 
     fun addSector(labelInput: String): Result<ManagedSector> {
         val clean = labelInput.trim().take(40)
@@ -302,6 +307,64 @@ class PortfolioSettingsStore(context: Context) {
         }
     }
 
+    fun savePortfolioPlan(plan: PortfolioPlan) {
+        val clean = plan.sanitized(timestampMillis = System.currentTimeMillis())
+        savePlanToPrefs(clean)
+        _portfolioPlan.value = clean
+    }
+
+    fun mergeImportedPlan(imported: PortfolioPlan?, replace: Boolean) {
+        if (imported == null) return
+        val current = _portfolioPlan.value
+        val next = when {
+            replace -> imported.sanitized(imported.updatedAtMillis ?: System.currentTimeMillis())
+            !imported.hasContent -> return
+            !current.hasContent -> imported.sanitized(imported.updatedAtMillis ?: System.currentTimeMillis())
+            else -> {
+                val mergedTargets = buildMap {
+                    for (cat in AssetCategory.entries) {
+                        val localVal = current.targetPercentFor(cat)
+                        val impVal = imported.targetPercentFor(cat)
+                        val chosen = if (localVal > 0.0) localVal else impVal
+                        if (chosen > 0.0) put(cat, chosen)
+                    }
+                }
+                val mergedNotes = buildMap {
+                    for (cat in AssetCategory.entries) {
+                        val localNote = current.noteFor(cat)
+                        val impNote = imported.noteFor(cat)
+                        val chosen = localNote.ifBlank { impNote }
+                        if (chosen.isNotBlank()) put(cat, chosen)
+                    }
+                }
+                val mergedOverall = current.overallNote.ifBlank { imported.overallNote }
+                PortfolioPlan(
+                    targetPercents = mergedTargets,
+                    categoryNotes = mergedNotes,
+                    overallNote = mergedOverall,
+                    updatedAtMillis = System.currentTimeMillis()
+                ).sanitized(System.currentTimeMillis())
+            }
+        }
+        savePlanToPrefs(next)
+        _portfolioPlan.value = next
+    }
+
+    private fun loadPlanFromPrefs(): PortfolioPlan {
+        val raw = prefs.getString(KEY_PORTFOLIO_PLAN_JSON, null)
+        if (raw.isNullOrBlank()) return PortfolioPlan()
+        return try {
+            PortfolioJsonCodec.decodePlanFromJsonObject(JSONObject(raw)) ?: PortfolioPlan()
+        } catch (_: Exception) {
+            PortfolioPlan()
+        }
+    }
+
+    private fun savePlanToPrefs(plan: PortfolioPlan) {
+        val json = PortfolioJsonCodec.encodePlanToJsonObject(plan).toString()
+        prefs.edit().putString(KEY_PORTFOLIO_PLAN_JSON, json).apply()
+    }
+
     private fun saveSectorsToPrefs(sectors: List<ManagedSector>) {
         val arr = JSONArray()
         for (s in sectors) {
@@ -324,6 +387,7 @@ class PortfolioSettingsStore(context: Context) {
 
         private const val PREFS_NAME = "portpulse_settings"
         private const val KEY_SECTORS_JSON = "managed_sectors_json"
+        private const val KEY_PORTFOLIO_PLAN_JSON = "portfolio_plan_json"
         private const val KEY_BACKUP_ENABLED = "auto_backup_enabled"
         private const val KEY_BACKUP_URI = "auto_backup_uri"
         private const val KEY_BACKUP_NAME = "auto_backup_file_name"

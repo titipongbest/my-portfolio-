@@ -85,7 +85,7 @@ private val AppShapes = Shapes(
 
 @Composable
 fun PortPulseTheme(
-    selectedCategory: AssetCategory = AssetCategory.THAI_STOCK,
+    selectedCategory: AssetCategory? = AssetCategory.THAI_STOCK,
     content: @Composable () -> Unit
 ) {
     val targetHeroDeep = categoryHeroDeepColor(selectedCategory)

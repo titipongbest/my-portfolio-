@@ -73,10 +73,13 @@ class PortfolioRepository(
         }
     }
 
-    suspend fun exportToJson(managedSectors: List<com.example.model.ManagedSector> = emptyList()): Result<String> {
+    suspend fun exportToJson(
+        managedSectors: List<com.example.model.ManagedSector> = emptyList(),
+        portfolioPlan: com.example.model.PortfolioPlan? = null
+    ): Result<String> {
         return try {
             val items = holdingDao.getAllHoldingsOnce()
-            Result.success(PortfolioJsonCodec.encode(items, managedSectors))
+            Result.success(PortfolioJsonCodec.encode(items, managedSectors, portfolioPlan))
         } catch (e: Exception) {
             Result.failure(e)
         }

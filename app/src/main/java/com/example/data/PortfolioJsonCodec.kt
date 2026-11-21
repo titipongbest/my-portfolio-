@@ -3,6 +3,7 @@ package com.example.data
 import com.example.model.AssetCategory
 import com.example.model.Holding
 import com.example.model.ManagedSector
+import com.example.model.PortfolioPlan
 import com.example.model.StockSector
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -13,17 +14,81 @@ import org.json.JSONObject
 
 data class PortfolioBackupPayload(
     val holdings: List<Holding>,
-    val sectors: List<ManagedSector> = emptyList()
+    val sectors: List<ManagedSector> = emptyList(),
+    val plan: PortfolioPlan? = null
 )
 
 object PortfolioJsonCodec {
-    private const val CURRENT_SCHEMA_VERSION = 1
+    private const val CURRENT_SCHEMA_VERSION = 2
     const val MAX_IMPORT_JSON_BYTES = 5 * 1024 * 1024
     private const val MAX_IMPORT_JSON_CHARS = 5 * 1024 * 1024
 
+    fun encodePlanToJsonObject(plan: PortfolioPlan): JSONObject {
+        val clean = plan.sanitized()
+        val targetsObj = JSONObject()
+        for (cat in AssetCategory.entries) {
+            val pct = clean.targetPercentFor(cat)
+            if (pct > 0.0) {
+                targetsObj.put(cat.name, pct)
+            }
+        }
+        val notesObj = JSONObject()
+        for (cat in AssetCategory.entries) {
+            val note = clean.noteFor(cat)
+            if (note.isNotBlank()) {
+                notesObj.put(cat.name, note)
+            }
+        }
+        return JSONObject().apply {
+            put("targetPercents", targetsObj)
+            put("categoryNotes", notesObj)
+            put("overallNote", clean.overallNote)
+            clean.updatedAtMillis?.takeIf { it > 0L }?.let { put("updatedAtMillis", it) }
+        }
+    }
+
+    fun decodePlanFromJsonObject(obj: JSONObject?): PortfolioPlan? {
+        if (obj == null) return null
+        val targets = mutableMapOf<AssetCategory, Double>()
+        obj.optJSONObject("targetPercents")?.let { tObj ->
+            for (cat in AssetCategory.entries) {
+                if (tObj.has(cat.name) && !tObj.isNull(cat.name)) {
+                    val v = tObj.optDouble(cat.name, Double.NaN)
+                    if (v.isFinite() && v >= 0.0) {
+                        targets[cat] = v.coerceIn(0.0, 100.0)
+                    }
+                }
+            }
+        }
+        val notes = mutableMapOf<AssetCategory, String>()
+        obj.optJSONObject("categoryNotes")?.let { nObj ->
+            for (cat in AssetCategory.entries) {
+                if (nObj.has(cat.name) && !nObj.isNull(cat.name)) {
+                    val text = nObj.optString(cat.name, "").trim()
+                    if (text.isNotEmpty()) {
+                        notes[cat] = text.take(PortfolioPlan.MAX_CATEGORY_NOTE_CHARS)
+                    }
+                }
+            }
+        }
+        val overallNote = if (obj.has("overallNote") && !obj.isNull("overallNote")) {
+            obj.optString("overallNote", "").trim().take(PortfolioPlan.MAX_OVERALL_NOTE_CHARS)
+        } else {
+            ""
+        }
+        val updatedAt = obj.optLong("updatedAtMillis", -1L).takeIf { it > 0L }
+        return PortfolioPlan(
+            targetPercents = targets,
+            categoryNotes = notes,
+            overallNote = overallNote,
+            updatedAtMillis = updatedAt
+        ).sanitized(updatedAt)
+    }
+
     fun encode(
         holdings: List<Holding>,
-        managedSectors: List<ManagedSector> = emptyList()
+        managedSectors: List<ManagedSector> = emptyList(),
+        portfolioPlan: PortfolioPlan? = null
     ): String {
         val isoFormatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
             timeZone = TimeZone.getTimeZone("UTC")
@@ -70,6 +135,9 @@ object PortfolioJsonCodec {
             put("holdings", holdingsArray)
             if (managedSectors.isNotEmpty()) {
                 put("sectors", sectorsArray)
+            }
+            if (portfolioPlan != null && portfolioPlan.hasContent) {
+                put("plan", encodePlanToJsonObject(portfolioPlan))
             }
         }
         return root.toString(2)
@@ -127,6 +195,8 @@ object PortfolioJsonCodec {
                     }
                 }
             }
+
+            val parsedPlan = decodePlanFromJsonObject(rootObj?.optJSONObject("plan"))
 
             val now = System.currentTimeMillis()
             val parsed = mutableListOf<Holding>()
@@ -208,11 +278,17 @@ object PortfolioJsonCodec {
                 )
             }
 
-            if (parsed.isEmpty()) {
+            if (parsed.isEmpty() && parsedPlan?.hasContent != true) {
                 return Result.failure(IllegalArgumentException("ไม่พบรายการสินทรัพย์ในไฟล์ JSON"))
             }
 
-            Result.success(PortfolioBackupPayload(holdings = parsed, sectors = parsedSectors))
+            Result.success(
+                PortfolioBackupPayload(
+                    holdings = parsed,
+                    sectors = parsedSectors,
+                    plan = parsedPlan
+                )
+            )
         } catch (e: Exception) {
             Result.failure(
                 IllegalArgumentException("ไม่สามารถอ่านไฟล์ JSON ได้: ${e.localizedMessage ?: "รูปแบบไม่ถูกต้อง"}")

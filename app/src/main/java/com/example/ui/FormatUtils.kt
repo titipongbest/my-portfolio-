@@ -12,14 +12,21 @@ object FormatUtils {
     private val qtyIntFormat = DecimalFormat("#,##0")
     private val qtyFracFormat = DecimalFormat("#,##0.######")
 
-    fun formatThb(amount: Double, showSign: Boolean = false): String {
+    fun formatThb(amount: Double, showSign: Boolean = false, decimals: Int = 2): String {
         val sign = when {
             !showSign -> if (amount < 0) "-" else ""
             amount > 0.004 -> "+"
             amount < -0.004 -> "-"
             else -> ""
         }
-        return "${sign}฿${thbDecimalFormat.format(abs(amount))}"
+        val formatted = if (decimals == 2) {
+            thbDecimalFormat.format(abs(amount))
+        } else if (decimals <= 0) {
+            thbCompactFormat.format(abs(amount))
+        } else {
+            DecimalFormat("#,##0." + "0".repeat(decimals)).format(abs(amount))
+        }
+        return "${sign}฿$formatted"
     }
 
     fun formatNumber(amount: Double, decimals: Int = 2, showSign: Boolean = false): String {

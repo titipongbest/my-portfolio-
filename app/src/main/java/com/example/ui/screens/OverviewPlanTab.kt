@@ -21,6 +21,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.TrackChanges
@@ -81,29 +83,38 @@ fun OverviewPlanTab(
     val fullSummary = uiState.fullPortfolioSummary
     val savedPlan = uiState.portfolioPlan
 
+    var isEditingPlan by remember { mutableStateOf(!savedPlan.hasContent) }
     val targetInputs = remember { mutableStateMapOf<AssetCategory, String>() }
     val noteInputs = remember { mutableStateMapOf<AssetCategory, String>() }
     var overallNoteInput by remember { mutableStateOf("") }
 
-    LaunchedEffect(savedPlan) {
+    fun syncDraftFromSaved(plan: PortfolioPlan) {
         for (cat in AssetCategory.entries) {
-            val pct = savedPlan.targetPercentFor(cat)
+            val pct = plan.targetPercentFor(cat)
             targetInputs[cat] = formatEditablePercent(pct)
-            noteInputs[cat] = savedPlan.noteFor(cat)
+            noteInputs[cat] = plan.noteFor(cat)
         }
-        overallNoteInput = savedPlan.overallNote
+        overallNoteInput = plan.overallNote
     }
 
-    val parsedTargets: Map<AssetCategory, Double> = AssetCategory.entries.associateWith { cat ->
-        parsePercentInput(targetInputs[cat].orEmpty())
+    LaunchedEffect(savedPlan) {
+        syncDraftFromSaved(savedPlan)
     }
-    val totalTarget = parsedTargets.values.sum()
+
+    val displayedTargets: Map<AssetCategory, Double> = if (isEditingPlan) {
+        AssetCategory.entries.associateWith { cat -> parsePercentInput(targetInputs[cat].orEmpty()) }
+    } else {
+        AssetCategory.entries.associateWith { cat -> savedPlan.targetPercentFor(cat) }
+    }
+    val totalTarget = displayedTargets.values.sum()
     val actualByCategory = remember(fullSummary.categorySlices) {
         fullSummary.categorySlices.associateBy { it.category }
     }
 
     fun buildDraftPlan(): PortfolioPlan {
-        val cleanTargets = parsedTargets.filterValues { it > 0.0 }
+        val cleanTargets = AssetCategory.entries.associateWith { cat ->
+            parsePercentInput(targetInputs[cat].orEmpty())
+        }.filterValues { it > 0.0 }
         val cleanNotes = buildMap {
             for (cat in AssetCategory.entries) {
                 val txt = noteInputs[cat].orEmpty().trim()
@@ -116,6 +127,13 @@ fun OverviewPlanTab(
             overallNote = overallNoteInput.trim(),
             updatedAtMillis = System.currentTimeMillis()
         )
+    }
+
+    fun commitPlanAndCloseEditor() {
+        focusManager.clearFocus()
+        val draft = buildDraftPlan()
+        onSavePlan(draft)
+        isEditingPlan = false
     }
 
     val isExact100 = abs(totalTarget - 100.0) < 0.05
@@ -148,8 +166,8 @@ fun OverviewPlanTab(
         modifier = modifier
             .fillMaxSize()
             .testTag("overview_plan_lazy_column"),
-        contentPadding = PaddingValues(bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        contentPadding = PaddingValues(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // 1. Plan Hero Banner + Floating Target Summary Card
         item {
@@ -255,7 +273,7 @@ fun OverviewPlanTab(
                             ) {
                                 val barDenominator = maxOf(totalTarget, 100.0)
                                 AssetCategory.entries.forEach { cat ->
-                                    val pct = parsedTargets[cat] ?: 0.0
+                                    val pct = displayedTargets[cat] ?: 0.0
                                     if (pct > 0.0) {
                                         Box(
                                             modifier = Modifier
@@ -272,78 +290,131 @@ fun OverviewPlanTab(
                                 }
                             }
 
-                            // Quick Presets
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                OutlinedButton(
-                                    onClick = {
-                                        AssetCategory.entries.forEach { cat ->
-                                            targetInputs[cat] = "20"
-                                        }
-                                    },
-                                    shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("plan_equal_weight_button")
+                            if (isEditingPlan) {
+                                // Quick Presets (Edit Mode only)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text(
-                                        text = "แบ่งเท่ากัน (20%)",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                    OutlinedButton(
+                                        onClick = {
+                                            AssetCategory.entries.forEach { cat ->
+                                                targetInputs[cat] = "20"
+                                            }
+                                        },
+                                        shape = RoundedCornerShape(10.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("plan_equal_weight_button")
+                                    ) {
+                                        Text(
+                                            text = "แบ่งเท่ากัน (20%)",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    OutlinedButton(
+                                        onClick = {
+                                            AssetCategory.entries.forEach { cat ->
+                                                val actual = actualByCategory[cat]?.percentOfPortfolio ?: 0.0
+                                                targetInputs[cat] = formatEditablePercent(actual)
+                                            }
+                                        },
+                                        enabled = fullSummary.totalValueThb > 0.0,
+                                        shape = RoundedCornerShape(10.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("plan_copy_actual_button")
+                                    ) {
+                                        Text(
+                                            text = "ดึงจากพอร์ตจริง",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
-                                OutlinedButton(
-                                    onClick = {
-                                        AssetCategory.entries.forEach { cat ->
-                                            val actual = actualByCategory[cat]?.percentOfPortfolio ?: 0.0
-                                            targetInputs[cat] = formatEditablePercent(actual)
-                                        }
-                                    },
-                                    enabled = fullSummary.totalValueThb > 0.0,
-                                    shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("plan_copy_actual_button")
-                                ) {
-                                    Text(
-                                        text = "ดึงจากพอร์ตจริง",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
 
-                            Button(
-                                onClick = {
-                                    focusManager.clearFocus()
-                                    onSavePlan(buildDraftPlan())
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = Color.White
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(46.dp)
-                                    .testTag("plan_save_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Save,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "บันทึกแผนการลงทุน",
-                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    if (savedPlan.hasContent) {
+                                        OutlinedButton(
+                                            onClick = {
+                                                focusManager.clearFocus()
+                                                syncDraftFromSaved(savedPlan)
+                                                isEditingPlan = false
+                                            },
+                                            shape = RoundedCornerShape(12.dp),
+                                            modifier = Modifier
+                                                .weight(0.42f)
+                                                .height(44.dp)
+                                                .testTag("plan_cancel_edit_button")
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = "ยกเลิก",
+                                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                                            )
+                                        }
+                                    }
+                                    Button(
+                                        onClick = { commitPlanAndCloseEditor() },
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = Color.White
+                                        ),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(44.dp)
+                                            .testTag("plan_save_button")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Save,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(17.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "บันทึกแผนการลงทุน",
+                                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                                        )
+                                    }
+                                }
+                            } else {
+                                OutlinedButton(
+                                    onClick = {
+                                        syncDraftFromSaved(savedPlan)
+                                        isEditingPlan = true
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(44.dp)
+                                        .testTag("plan_edit_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "แก้ไขแผน",
+                                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                }
                             }
                         }
                     }
@@ -361,14 +432,18 @@ fun OverviewPlanTab(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "กำหนดสัดส่วนเป้าหมายรายสินทรัพย์",
+                    text = if (isEditingPlan) "กำหนดสัดส่วนเป้าหมายรายสินทรัพย์" else "สัดส่วนเป้าหมายรายสินทรัพย์",
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onBackground
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp)
                 )
                 Text(
                     text = "รวม 100%",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = portfolioColors.mutedSlate
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = portfolioColors.mutedSlate,
+                    softWrap = false
                 )
             }
         }
@@ -383,7 +458,8 @@ fun OverviewPlanTab(
             val actualSlice = actualByCategory[cat]
             val actualPct = actualSlice?.percentOfPortfolio ?: 0.0
             val actualValue = actualSlice?.totalValueThb ?: 0.0
-            val targetPct = parsedTargets[cat] ?: 0.0
+            val targetPct = displayedTargets[cat] ?: 0.0
+            val savedNote = savedPlan.noteFor(cat)
             val diffPct = targetPct - actualPct
             val targetValueThb = fullSummary.totalValueThb * (targetPct / 100.0)
             val rebalanceThb = targetValueThb - actualValue
@@ -409,7 +485,7 @@ fun OverviewPlanTab(
                                 )
                             }
                             .padding(start = 17.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -440,35 +516,65 @@ fun OverviewPlanTab(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "ปัจจุบัน ${FormatUtils.formatPercent(actualPct, decimals = 1)} (${FormatUtils.formatThb(actualValue, decimals = 0)})",
+                                    text = "ปัจจุบัน ${FormatUtils.formatPercent(actualPct, decimals = 1)}",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = portfolioColors.mutedSlate,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    color = portfolioColors.mutedSlate
+                                )
+                                Text(
+                                    text = FormatUtils.formatThb(actualValue, decimals = 0),
+                                    style = NumericStyleSmall.copy(
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    softWrap = false
                                 )
                             }
 
-                            OutlinedTextField(
-                                value = targetInputs[cat].orEmpty(),
-                                onValueChange = { raw ->
-                                    val filtered = sanitizeDecimalInput(raw)
-                                    targetInputs[cat] = filtered
-                                },
-                                label = { Text("เป้า %", style = MaterialTheme.typography.labelSmall) },
-                                suffix = { Text("%", style = MaterialTheme.typography.labelMedium) },
-                                singleLine = true,
-                                colors = inputColors,
-                                textStyle = NumericStyleSmall.copy(
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = catAccent
-                                ),
-                                shape = RoundedCornerShape(12.dp),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                modifier = Modifier
-                                    .width(108.dp)
-                                    .testTag("plan_target_input_${cat.name}")
-                            )
+                            if (isEditingPlan) {
+                                OutlinedTextField(
+                                    value = targetInputs[cat].orEmpty(),
+                                    onValueChange = { raw ->
+                                        val filtered = sanitizeDecimalInput(raw)
+                                        targetInputs[cat] = filtered
+                                    },
+                                    label = { Text("เป้า %", style = MaterialTheme.typography.labelSmall) },
+                                    suffix = { Text("%", style = MaterialTheme.typography.labelMedium) },
+                                    singleLine = true,
+                                    colors = inputColors,
+                                    textStyle = NumericStyleSmall.copy(
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = catAccent
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    modifier = Modifier
+                                        .width(104.dp)
+                                        .testTag("plan_target_input_${cat.name}")
+                                )
+                            } else {
+                                Surface(
+                                    color = if (targetPct > 0.0) catContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text(
+                                        text = if (targetPct > 0.0) {
+                                            "เป้า ${FormatUtils.formatPercent(targetPct, decimals = 1)}"
+                                        } else {
+                                            "ยังไม่ตั้งเป้า"
+                                        },
+                                        style = NumericStyleSmall.copy(
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (targetPct > 0.0) catOnContainer else portfolioColors.mutedSlate
+                                        ),
+                                        modifier = Modifier
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                            .testTag("plan_target_badge_${cat.name}")
+                                    )
+                                }
+                            }
                         }
 
                         // Comparison Progress + Rebalance Guidance
@@ -523,26 +629,55 @@ fun OverviewPlanTab(
                             }
                         }
 
-                        // Per-Category Note
-                        OutlinedTextField(
-                            value = noteInputs[cat].orEmpty(),
-                            onValueChange = { text ->
-                                noteInputs[cat] = text.take(PortfolioPlan.MAX_CATEGORY_NOTE_CHARS)
-                            },
-                            placeholder = {
-                                Text(
-                                    text = "โน้ตสำหรับ${cat.shortLabelTh} (เช่น กลยุทธ์ หรือสินทรัพย์ที่สนใจ)",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            },
-                            colors = inputColors,
-                            textStyle = MaterialTheme.typography.bodySmall,
-                            shape = RoundedCornerShape(12.dp),
-                            maxLines = 3,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("plan_category_note_${cat.name}")
-                        )
+                        // Per-Category Note: Editable TextField in Edit Mode, Clean Read-Only Note Strip in View Mode
+                        if (isEditingPlan) {
+                            OutlinedTextField(
+                                value = noteInputs[cat].orEmpty(),
+                                onValueChange = { text ->
+                                    noteInputs[cat] = text.take(PortfolioPlan.MAX_CATEGORY_NOTE_CHARS)
+                                },
+                                placeholder = {
+                                    Text(
+                                        text = "โน้ตสำหรับ${cat.shortLabelTh} (เช่น กลยุทธ์ หรือสินทรัพย์ที่สนใจ)",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                },
+                                colors = inputColors,
+                                textStyle = MaterialTheme.typography.bodySmall,
+                                shape = RoundedCornerShape(12.dp),
+                                maxLines = 3,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("plan_category_note_${cat.name}")
+                            )
+                        } else if (savedNote.isNotBlank()) {
+                            Surface(
+                                color = catContainer.copy(alpha = 0.55f),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.EditNote,
+                                        contentDescription = null,
+                                        tint = catOnContainer,
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .padding(top = 1.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = savedNote,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = catOnContainer,
+                                        modifier = Modifier.testTag("plan_category_note_text_${cat.name}")
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -586,26 +721,49 @@ fun OverviewPlanTab(
                             }
                         }
 
-                        OutlinedTextField(
-                            value = overallNoteInput,
-                            onValueChange = { text ->
-                                overallNoteInput = text.take(PortfolioPlan.MAX_OVERALL_NOTE_CHARS)
-                            },
-                            placeholder = {
+                        if (isEditingPlan) {
+                            OutlinedTextField(
+                                value = overallNoteInput,
+                                onValueChange = { text ->
+                                    overallNoteInput = text.take(PortfolioPlan.MAX_OVERALL_NOTE_CHARS)
+                                },
+                                placeholder = {
+                                    Text(
+                                        text = "เช่น เติมเงิน DCA ทุกวันที่ 25 ของเดือน, รีบาลานซ์ทุกไตรมาสเมื่อสัดส่วนคลาดเคลื่อนเกิน 5%",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                },
+                                colors = inputColors,
+                                textStyle = MaterialTheme.typography.bodyMedium,
+                                shape = RoundedCornerShape(12.dp),
+                                minLines = 4,
+                                maxLines = 8,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("plan_overall_note_input")
+                            )
+                        } else if (savedPlan.overallNote.isNotBlank()) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
                                 Text(
-                                    text = "เช่น เติมเงิน DCA ทุกวันที่ 25 ของเดือน, รีบาลานซ์ทุกไตรมาสเมื่อสัดส่วนคลาดเคลื่อนเกิน 5%",
-                                    style = MaterialTheme.typography.bodySmall
+                                    text = savedPlan.overallNote,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier
+                                        .padding(12.dp)
+                                        .testTag("plan_overall_note_text")
                                 )
-                            },
-                            colors = inputColors,
-                            textStyle = MaterialTheme.typography.bodyMedium,
-                            shape = RoundedCornerShape(12.dp),
-                            minLines = 4,
-                            maxLines = 8,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("plan_overall_note_input")
-                        )
+                            }
+                        } else {
+                            Text(
+                                text = "ยังไม่ได้บันทึกโน้ตเพิ่มเติม กดปุ่ม \"แก้ไขแผน\" ด้านบนเพื่อเพิ่มโน้ต",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = portfolioColors.mutedSlate
+                            )
+                        }
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
@@ -632,31 +790,30 @@ fun OverviewPlanTab(
                             )
                         }
 
-                        Button(
-                            onClick = {
-                                focusManager.clearFocus()
-                                onSavePlan(buildDraftPlan())
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = Color.White
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(46.dp)
-                                .testTag("plan_save_bottom_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Save,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "บันทึกแผนและโน้ต",
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
-                            )
+                        if (isEditingPlan) {
+                            Button(
+                                onClick = { commitPlanAndCloseEditor() },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = Color.White
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(46.dp)
+                                    .testTag("plan_save_bottom_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Save,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "บันทึกแผนและโน้ต",
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                                )
+                            }
                         }
                     }
                 }

@@ -25,9 +25,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -60,9 +61,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
@@ -73,8 +71,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -92,6 +88,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
@@ -519,162 +516,37 @@ fun MainPortfolioScreen(
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val useRail = maxWidth >= 600.dp
         val portfolioColors = LocalPortfolioColors.current
-        val activeTabLabel = if (uiState.isOverviewSelected) {
-            selectedOverviewTab.labelTh
-        } else {
-            selectedTab.labelTh
-        }
-        val activeScopeLabel = if (uiState.isOverviewSelected) {
-            "Overview"
-        } else {
-            uiState.selectedCategory.shortLabelTh
-        }
 
         Scaffold(
-            contentWindowInsets = WindowInsets.safeDrawing,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             containerColor = MaterialTheme.colorScheme.background,
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             topBar = {
-                TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = portfolioColors.navyHeroDeep,
-                        titleContentColor = Color.White,
-                        actionIconContentColor = Color.White
-                    ),
-                    title = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Color.White.copy(alpha = 0.14f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PieChart,
-                                    contentDescription = "PortPulse",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = "PortPulse",
-                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = "$activeTabLabel • $activeScopeLabel",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White.copy(alpha = 0.80f)
-                                )
-                            }
-                        }
+                TopCategoryDropdownBar(
+                    isOverviewSelected = uiState.isOverviewSelected,
+                    selectedCategory = uiState.selectedCategory,
+                    allHoldings = uiState.allHoldings,
+                    isPinEnabled = uiState.securityConfig.isPinEnabled,
+                    onSelectOverview = {
+                        viewModel.selectOverview()
                     },
-                    actions = {
-                        IconButton(
-                            onClick = { showSecurityDialog = true },
-                            modifier = Modifier.testTag("security_lock_button")
-                        ) {
-                            Icon(
-                                imageVector = if (uiState.securityConfig.isPinEnabled) {
-                                    Icons.Default.Lock
-                                } else {
-                                    Icons.Default.LockOpen
-                                },
-                                contentDescription = "ล็อกแอปด้วย PIN และลายนิ้วมือ",
-                                tint = Color.White
-                            )
-                        }
-                        IconButton(
-                            onClick = {
-                                viewModel.clearActionMessage()
-                                showBackupScreen = true
-                            },
-                            modifier = Modifier.testTag("backup_screen_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Backup,
-                                contentDescription = "สำรองข้อมูล",
-                                tint = Color.White
-                            )
-                        }
+                    onSelectCategory = viewModel::selectCategory,
+                    onSecurityClick = { showSecurityDialog = true },
+                    onBackupClick = {
+                        viewModel.clearActionMessage()
+                        showBackupScreen = true
                     }
                 )
             },
             bottomBar = {
                 if (!useRail) {
-                    Column(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
-                        HorizontalDivider(
-                            thickness = 1.dp,
-                            color = MaterialTheme.colorScheme.outline
-                        )
-                        NavigationBar(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            tonalElevation = 0.dp
-                        ) {
-                            if (uiState.isOverviewSelected) {
-                                OverviewTabMenu.entries.forEach { tab ->
-                                    NavigationBarItem(
-                                        selected = selectedOverviewTab == tab,
-                                        onClick = { selectedOverviewTab = tab },
-                                        icon = {
-                                            Icon(
-                                                imageVector = tab.icon,
-                                                contentDescription = tab.labelTh
-                                            )
-                                        },
-                                        label = {
-                                            Text(
-                                                text = tab.labelTh,
-                                                style = MaterialTheme.typography.labelSmall.copy(
-                                                    fontWeight = if (selectedOverviewTab == tab) FontWeight.Bold else FontWeight.Medium
-                                                )
-                                            )
-                                        },
-                                        colors = NavigationBarItemDefaults.colors(
-                                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                                            unselectedIconColor = portfolioColors.mutedSlate,
-                                            unselectedTextColor = portfolioColors.mutedSlate
-                                        ),
-                                        modifier = Modifier.testTag("overview_nav_tab_${tab.name}")
-                                    )
-                                }
-                            } else {
-                                MainTab.entries.forEach { tab ->
-                                    NavigationBarItem(
-                                        selected = selectedTab == tab,
-                                        onClick = { selectedTab = tab },
-                                        icon = {
-                                            Icon(
-                                                imageVector = tab.icon,
-                                                contentDescription = tab.labelTh
-                                            )
-                                        },
-                                        label = {
-                                            Text(
-                                                text = tab.labelTh,
-                                                style = MaterialTheme.typography.labelSmall.copy(
-                                                    fontWeight = if (selectedTab == tab) FontWeight.Bold else FontWeight.Medium
-                                                )
-                                            )
-                                        },
-                                        colors = NavigationBarItemDefaults.colors(
-                                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                                            unselectedIconColor = portfolioColors.mutedSlate,
-                                            unselectedTextColor = portfolioColors.mutedSlate
-                                        ),
-                                        modifier = Modifier.testTag("nav_tab_${tab.name}")
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    SlimBottomNavBar(
+                        isOverviewSelected = uiState.isOverviewSelected,
+                        selectedMainTab = selectedTab,
+                        selectedOverviewTab = selectedOverviewTab,
+                        onSelectMainTab = { selectedTab = it },
+                        onSelectOverviewTab = { selectedOverviewTab = it }
+                    )
                 }
             }
         ) { innerPadding ->
@@ -682,19 +554,9 @@ fun MainPortfolioScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
+                    .then(if (useRail) Modifier.navigationBarsPadding() else Modifier)
                     .background(MaterialTheme.colorScheme.background)
             ) {
-                // Master Category Selector framed cleanly at the top of the hero zone
-                TopCategoryDropdownBar(
-                    isOverviewSelected = uiState.isOverviewSelected,
-                    selectedCategory = uiState.selectedCategory,
-                    allHoldings = uiState.allHoldings,
-                    onSelectOverview = {
-                        viewModel.selectOverview()
-                    },
-                    onSelectCategory = viewModel::selectCategory
-                )
-
                 Row(
                     modifier = Modifier
                         .weight(1f)
@@ -1115,8 +977,11 @@ private fun TopCategoryDropdownBar(
     isOverviewSelected: Boolean,
     selectedCategory: AssetCategory,
     allHoldings: List<Holding>,
+    isPinEnabled: Boolean,
     onSelectOverview: () -> Unit,
     onSelectCategory: (AssetCategory) -> Unit,
+    onSecurityClick: () -> Unit,
+    onBackupClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -1141,145 +1006,273 @@ private fun TopCategoryDropdownBar(
         modifier = modifier
             .fillMaxWidth()
             .background(portfolioColors.navyHeroDeep)
-            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .statusBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
-        Surface(
-            color = Color.White.copy(alpha = 0.10f),
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.22f)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .clickable { expanded = true }
-                .testTag("top_category_dropdown")
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+            Box(modifier = Modifier.weight(1f)) {
+                Surface(
+                    color = Color.White.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.24f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { expanded = true }
+                        .testTag("top_category_dropdown")
                 ) {
-                    Text(
-                        text = "ชนิดสินทรัพย์หลัก • ครอบคลุมทุกเมนู",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = Color.White.copy(alpha = 0.88f),
-                        softWrap = true,
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp)
-                    )
-                    Surface(
-                        color = Color.White,
-                        shape = RoundedCornerShape(8.dp)
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "$activeCount รายการ",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = portfolioColors.navyHeroDeep,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        Surface(
+                            color = activeContainer,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = activeIcon,
+                                    contentDescription = activeLabel,
+                                    tint = activeOnContainer,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 6.dp),
+                            verticalArrangement = Arrangement.spacedBy(1.dp)
+                        ) {
+                            Text(
+                                text = activeLabel,
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontSize = 14.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = Color.White,
+                                softWrap = true
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "$activeCount รายการ",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    ),
+                                    color = Color.White.copy(alpha = 0.86f)
+                                )
+                                Text(
+                                    text = "•",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White.copy(alpha = 0.55f)
+                                )
+                                Text(
+                                    text = "เปลี่ยน",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = Color.White
+                                )
+                            }
+                        }
+                        Icon(
+                            imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = "เปิดเมนูเลือกหมวดหมู่",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier
+                        .widthIn(min = 280.dp)
+                        .fillMaxWidth(0.92f)
+                        .background(MaterialTheme.colorScheme.surface)
                 ) {
-                    Surface(
-                        color = activeContainer,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = activeIcon,
-                                contentDescription = activeLabel,
-                                tint = activeOnContainer,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = activeLabel,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White,
-                        softWrap = true,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp)
+                    CategoryDropdownRow(
+                        label = "ภาพรวมทุกสินทรัพย์ (Overview)",
+                        count = allHoldings.size,
+                        category = null,
+                        icon = Icons.Default.Dashboard,
+                        isSelected = isOverviewSelected,
+                        onClick = {
+                            expanded = false
+                            onSelectOverview()
+                        },
+                        testTag = "top_dropdown_OVERVIEW"
                     )
-                    Surface(
-                        color = Color.White,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "เปลี่ยน",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = portfolioColors.navyHeroDeep
-                            )
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Icon(
-                                imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                contentDescription = "เปิดเมนูเลือกหมวดหมู่",
-                                tint = portfolioColors.navyHeroDeep,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.65f)
+                    )
+                    AssetCategory.entries.forEach { cat ->
+                        val count = allHoldings.count { it.assetCategory == cat }
+                        CategoryDropdownRow(
+                            label = cat.labelTh,
+                            count = count,
+                            category = cat,
+                            icon = categoryMenuIcon(cat),
+                            isSelected = !isOverviewSelected && selectedCategory == cat,
+                            onClick = {
+                                expanded = false
+                                onSelectCategory(cat)
+                            },
+                            testTag = "top_dropdown_${cat.name}"
+                        )
                     }
                 }
             }
-        }
 
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier
-                .widthIn(min = 280.dp)
-                .fillMaxWidth(0.92f)
-                .background(MaterialTheme.colorScheme.surface)
-        ) {
-            CategoryDropdownRow(
-                label = "ภาพรวมทุกสินทรัพย์ (Overview)",
-                count = allHoldings.size,
-                category = null,
-                icon = Icons.Default.Dashboard,
-                isSelected = isOverviewSelected,
-                onClick = {
-                    expanded = false
-                    onSelectOverview()
-                },
-                testTag = "top_dropdown_OVERVIEW"
-            )
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 4.dp),
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.65f)
-            )
-            AssetCategory.entries.forEach { cat ->
-                val count = allHoldings.count { it.assetCategory == cat }
-                CategoryDropdownRow(
-                    label = cat.labelTh,
-                    count = count,
-                    category = cat,
-                    icon = categoryMenuIcon(cat),
-                    isSelected = !isOverviewSelected && selectedCategory == cat,
-                    onClick = {
-                        expanded = false
-                        onSelectCategory(cat)
-                    },
-                    testTag = "top_dropdown_${cat.name}"
+            IconButton(
+                onClick = onSecurityClick,
+                modifier = Modifier
+                    .size(38.dp)
+                    .testTag("security_lock_button")
+            ) {
+                Icon(
+                    imageVector = if (isPinEnabled) Icons.Default.Lock else Icons.Default.LockOpen,
+                    contentDescription = "ล็อกแอปด้วย PIN และลายนิ้วมือ",
+                    tint = Color.White,
+                    modifier = Modifier.size(21.dp)
+                )
+            }
+            IconButton(
+                onClick = onBackupClick,
+                modifier = Modifier
+                    .size(38.dp)
+                    .testTag("backup_screen_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Backup,
+                    contentDescription = "สำรองข้อมูล",
+                    tint = Color.White,
+                    modifier = Modifier.size(21.dp)
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun SlimBottomNavBar(
+    isOverviewSelected: Boolean,
+    selectedMainTab: MainTab,
+    selectedOverviewTab: OverviewTabMenu,
+    onSelectMainTab: (MainTab) -> Unit,
+    onSelectOverviewTab: (OverviewTabMenu) -> Unit
+) {
+    val portfolioColors = LocalPortfolioColors.current
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+    ) {
+        HorizontalDivider(
+            thickness = 1.dp,
+            color = MaterialTheme.colorScheme.outline
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .height(54.dp)
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isOverviewSelected) {
+                OverviewTabMenu.entries.forEach { tab ->
+                    SlimBottomNavItem(
+                        label = tab.labelTh,
+                        icon = tab.icon,
+                        selected = selectedOverviewTab == tab,
+                        mutedColor = portfolioColors.mutedSlate,
+                        onClick = { onSelectOverviewTab(tab) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("overview_nav_tab_${tab.name}")
+                    )
+                }
+            } else {
+                MainTab.entries.forEach { tab ->
+                    SlimBottomNavItem(
+                        label = tab.labelTh,
+                        icon = tab.icon,
+                        selected = selectedMainTab == tab,
+                        mutedColor = portfolioColors.mutedSlate,
+                        onClick = { onSelectMainTab(tab) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("nav_tab_${tab.name}")
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SlimBottomNavItem(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    mutedColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val activeColor = MaterialTheme.colorScheme.primary
+    val contentColor = if (selected) activeColor else mutedColor
+
+    Column(
+        modifier = modifier
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .width(46.dp)
+                .height(26.dp)
+                .clip(RoundedCornerShape(13.dp))
+                .background(
+                    if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = contentColor,
+                modifier = Modifier.size(19.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 11.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+            ),
+            color = contentColor,
+            maxLines = 1
+        )
     }
 }
 

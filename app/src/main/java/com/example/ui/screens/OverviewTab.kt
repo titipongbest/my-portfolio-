@@ -700,12 +700,12 @@ private fun OverviewKpiCell(
         Text(
             text = value,
             style = NumericStyleMedium.copy(
-                fontSize = 17.sp,
+                fontSize = 15.5.sp,
                 fontWeight = FontWeight.Bold,
                 color = valueColor
             ),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            softWrap = true,
+            textAlign = TextAlign.Center
         )
     }
 }
@@ -871,9 +871,10 @@ private fun OverviewCategoryBreakdownCard(
                         },
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
                         color = pnlColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
+                        softWrap = true,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp)
                     )
                     if (model.targetPercent > 0.0) {
                         val diff = actualPct - model.targetPercent
@@ -885,7 +886,8 @@ private fun OverviewCategoryBreakdownCard(
                         Text(
                             text = "ต่าง ${FormatUtils.formatPercent(diff, decimals = 1, showSign = true)}",
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = diffColor
+                            color = diffColor,
+                            softWrap = false
                         )
                     }
                 }

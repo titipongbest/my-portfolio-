@@ -96,9 +96,6 @@ class PortfolioEmulatorTest {
 
         composeRule.onNodeWithTag("top_category_dropdown").assertIsDisplayed()
         assertTextNotTruncated(
-            composeRule.onNode(hasText("ชนิดสินทรัพย์หลัก • ครอบคลุมทุกเมนู") and inHeader, useUnmergedTree = true)
-        )
-        assertTextNotTruncated(
             composeRule.onNode(hasText("0 รายการ") and inHeader, useUnmergedTree = true)
         )
         assertTextNotTruncated(
@@ -137,7 +134,10 @@ class PortfolioEmulatorTest {
                 composeRule.onNode(hasText(category.labelTh) and inHeader, useUnmergedTree = true)
             )
             assertTextNotTruncated(
-                composeRule.onNode(hasText("ชนิดสินทรัพย์หลัก • ครอบคลุมทุกเมนู") and inHeader, useUnmergedTree = true)
+                composeRule.onNode(hasText("0 รายการ") and inHeader, useUnmergedTree = true)
+            )
+            assertTextNotTruncated(
+                composeRule.onNode(hasText("เปลี่ยน") and inHeader, useUnmergedTree = true)
             )
         }
     }
@@ -463,6 +463,23 @@ class PortfolioEmulatorTest {
         composeRule.onNodeWithTag("overview_plan_lazy_column")
             .performScrollToNode(hasTestTag("plan_save_bottom_button"))
         composeRule.onNodeWithTag("plan_save_bottom_button").performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        // After saving, edit input boxes must be hidden and read-only note + Edit Plan button shown
+        composeRule.onNodeWithTag("plan_overall_note_input").assertDoesNotExist()
+        composeRule.onNodeWithTag("plan_save_bottom_button").assertDoesNotExist()
+        composeRule.onNodeWithTag("plan_overall_note_text").performScrollTo().assertIsDisplayed()
+
+        composeRule.onNodeWithTag("overview_plan_lazy_column")
+            .performScrollToNode(hasTestTag("plan_edit_button"))
+        composeRule.onNodeWithTag("plan_edit_button").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("overview_plan_lazy_column")
+            .performScrollToNode(hasTestTag("plan_category_card_THAI_STOCK"))
+        composeRule.onNodeWithTag("plan_target_input_THAI_STOCK").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("overview_plan_lazy_column")
+            .performScrollToNode(hasTestTag("plan_cancel_edit_button"))
+        composeRule.onNodeWithTag("plan_cancel_edit_button").performClick()
         composeRule.waitForIdle()
 
         // 6) Export JSON backup and confirm plan targets & notes are included in backup file

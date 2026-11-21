@@ -469,12 +469,12 @@ private fun KpiMetricCell(
         Text(
             text = value,
             style = NumericStyleMedium.copy(
-                fontSize = 17.sp,
+                fontSize = 15.5.sp,
                 fontWeight = FontWeight.Bold,
                 color = valueColor
             ),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            softWrap = true,
+            textAlign = TextAlign.Center
         )
     }
 }

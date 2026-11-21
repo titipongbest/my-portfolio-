@@ -60,6 +60,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.AssetCategory
+import com.example.model.PortfolioAnalyzer
 import com.example.model.PortfolioPlan
 import com.example.ui.FormatUtils
 import com.example.ui.PortfolioUiState
@@ -109,6 +110,9 @@ fun OverviewPlanTab(
     val totalTarget = displayedTargets.values.sum()
     val actualByCategory = remember(fullSummary.categorySlices) {
         fullSummary.categorySlices.associateBy { it.category }
+    }
+    val rebalanceSummary = remember(fullSummary, displayedTargets) {
+        PortfolioAnalyzer.calculatePlanRebalance(fullSummary, displayedTargets)
     }
 
     fun buildDraftPlan(): PortfolioPlan {
@@ -290,6 +294,75 @@ fun OverviewPlanTab(
                                 }
                             }
 
+                            if (rebalanceSummary.isValidForCalculation && rebalanceSummary.totalFreshCashNeededThb >= 1.0) {
+                                Surface(
+                                    color = portfolioColors.costBoxBg,
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.dp, portfolioColors.costBoxBorder),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("plan_rebalance_summary_box")
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "ปรับพอร์ตแบบเติมเงินเพิ่ม (คำนวณบนมูลค่าพอร์ตใหม่)",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                            color = portfolioColors.costBoxLabel
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = "ต้องเติมเงินรวม",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = portfolioColors.mutedSlate
+                                                )
+                                                Text(
+                                                    text = FormatUtils.formatThb(
+                                                        rebalanceSummary.totalFreshCashNeededThb,
+                                                        showSign = true,
+                                                        decimals = 0
+                                                    ),
+                                                    style = NumericStyleSmall.copy(
+                                                        fontSize = 14.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                )
+                                            }
+                                            Column(
+                                                modifier = Modifier.weight(1f),
+                                                horizontalAlignment = Alignment.End
+                                            ) {
+                                                Text(
+                                                    text = "มูลค่าพอร์ตหลังเติม",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = portfolioColors.mutedSlate
+                                                )
+                                                Text(
+                                                    text = FormatUtils.formatThb(
+                                                        rebalanceSummary.targetTotalThb,
+                                                        decimals = 0
+                                                    ),
+                                                    style = NumericStyleSmall.copy(
+                                                        fontSize = 14.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             if (isEditingPlan) {
                                 // Quick Presets (Edit Mode only)
                                 Row(
@@ -460,9 +533,8 @@ fun OverviewPlanTab(
             val actualValue = actualSlice?.totalValueThb ?: 0.0
             val targetPct = displayedTargets[cat] ?: 0.0
             val savedNote = savedPlan.noteFor(cat)
-            val diffPct = targetPct - actualPct
-            val targetValueThb = fullSummary.totalValueThb * (targetPct / 100.0)
-            val rebalanceThb = targetValueThb - actualValue
+            val catRebalance = rebalanceSummary.byCategory[cat]
+            val diffPct = catRebalance?.diffPercent ?: (targetPct - actualPct)
 
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Surface(
@@ -609,22 +681,38 @@ fun OverviewPlanTab(
                                     }
                                 }
 
-                                if (fullSummary.totalValueThb > 0.0 && targetPct > 0.0) {
-                                    val guidanceColor = when {
-                                        abs(diffPct) <= 0.5 -> portfolioColors.profit
-                                        diffPct > 0.0 -> catAccent
-                                        else -> portfolioColors.loss
+                                if (fullSummary.totalValueThb > 0.0 && catRebalance != null) {
+                                    val guidancePair: Pair<String, Color>? = when {
+                                        isOver100 && targetPct > 0.0 -> {
+                                            "ปรับยอดรวมเป้าหมายให้ไม่เกิน 100% เพื่อคำนวณยอดเติมเงิน" to portfolioColors.loss
+                                        }
+                                        catRebalance.requiresSellForZeroTarget -> {
+                                            "เป้าหมาย 0% • ควรลด/ขายออก ${FormatUtils.formatThb(catRebalance.actualValueThb, decimals = 0)}" to portfolioColors.loss
+                                        }
+                                        targetPct <= 0.0 || !rebalanceSummary.isValidForCalculation -> null
+                                        catRebalance.freshCashAddThb >= 1.0 -> {
+                                            val label = if (diffPct >= 0.0) {
+                                                "ควรเติมเพิ่ม ${FormatUtils.formatThb(catRebalance.freshCashAddThb, decimals = 0)} (ขาด ${FormatUtils.formatPercent(diffPct, decimals = 1)})"
+                                            } else {
+                                                "เติมเพิ่ม ${FormatUtils.formatThb(catRebalance.freshCashAddThb, decimals = 0)} เมื่อปรับครบทั้งพอร์ต (ปัจจุบันเกิน ${FormatUtils.formatPercent(abs(diffPct), decimals = 1)})"
+                                            }
+                                            label to catAccent
+                                        }
+                                        diffPct < -0.5 -> {
+                                            "เกินเป้า ${FormatUtils.formatPercent(abs(diffPct), decimals = 1)} • ไม่ต้องเติมเพิ่ม (หรือขายปรับพอร์ต ${FormatUtils.formatThb(abs(catRebalance.swapDeltaThb), decimals = 0)})" to portfolioColors.loss
+                                        }
+                                        else -> {
+                                            "สัดส่วนใกล้เคียงเป้าหมายแล้ว" to portfolioColors.profit
+                                        }
                                     }
-                                    val guidanceText = when {
-                                        abs(diffPct) <= 0.5 -> "สัดส่วนใกล้เคียงเป้าหมายแล้ว"
-                                        rebalanceThb > 0.0 -> "ควรเพิ่มอีก ${FormatUtils.formatThb(rebalanceThb, decimals = 0)} (${FormatUtils.formatPercent(diffPct, decimals = 1, showSign = true)})"
-                                        else -> "เกินเป้าอยู่ ${FormatUtils.formatThb(abs(rebalanceThb), decimals = 0)} (${FormatUtils.formatPercent(diffPct, decimals = 1, showSign = true)})"
+                                    if (guidancePair != null) {
+                                        Text(
+                                            text = guidancePair.first,
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                            color = guidancePair.second,
+                                            softWrap = true
+                                        )
                                     }
-                                    Text(
-                                        text = guidanceText,
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                                        color = guidanceColor
-                                    )
                                 }
                             }
                         }

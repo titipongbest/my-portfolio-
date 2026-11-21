@@ -217,6 +217,114 @@ object PortfolioAnalyzer {
         )
     }
 
+    /**
+     * Calculates exact rebalance amounts for each [AssetCategory].
+     *
+     * For fresh-cash (buy-only) rebalancing without selling existing holdings:
+     * Adding money grows total portfolio value from V to V_target, so each targeted category k
+     * with target weight p_k must satisfy (A_k + x_k) / V_target = p_k with x_k >= 0.
+     * The minimum target total portfolio value is:
+     *   V_target = max(V, max_{p_k > 0}(A_k / p_k), untargetedValue / (1 - sum(p_k)) [if sum(p_k) < 1])
+     * and each category's required fresh-cash addition is:
+     *   x_k = max(0, V_target * p_k - A_k).
+     *
+     * Example: Portfolio V = 100, Thai Stock = 100 (target 92%), Gold = 0 (target 8%):
+     *   V_target = 100 / 0.92 = 108.6957
+     *   Gold top-up = 108.6957 * 0.08 = 8.6957 -> 8.6957 / 108.6957 = 8.00% exactly.
+     */
+    fun calculatePlanRebalance(
+        summary: PortfolioSummary,
+        targetPercents: Map<AssetCategory, Double>
+    ): PlanRebalanceSummary {
+        val currentTotal = summary.totalValueThb.takeIf { it.isFinite() && it > 0.0 } ?: 0.0
+        val cleanTargets = AssetCategory.entries.associateWith { cat ->
+            targetPercents[cat]?.takeIf { it.isFinite() && it > 0.0 }?.coerceIn(0.0, 100.0) ?: 0.0
+        }
+        val totalTargetPct = cleanTargets.values.sum()
+        val actualByCat = summary.categorySlices.associateBy { it.category }
+
+        if (currentTotal <= 0.0 || totalTargetPct <= 0.0 || totalTargetPct > 100.05) {
+            return PlanRebalanceSummary(
+                currentTotalThb = currentTotal,
+                targetTotalThb = currentTotal,
+                totalFreshCashNeededThb = 0.0,
+                totalTargetPercent = totalTargetPct,
+                isValidForCalculation = false,
+                hasZeroTargetHoldings = false,
+                byCategory = AssetCategory.entries.associateWith { cat ->
+                    val actualVal = actualByCat[cat]?.totalValueThb ?: 0.0
+                    val actualPct = actualByCat[cat]?.percentOfPortfolio ?: 0.0
+                    val targetPct = cleanTargets[cat] ?: 0.0
+                    CategoryRebalancePlan(
+                        category = cat,
+                        actualValueThb = actualVal,
+                        actualPercent = actualPct,
+                        targetPercent = targetPct,
+                        diffPercent = targetPct - actualPct,
+                        freshCashAddThb = 0.0,
+                        swapDeltaThb = 0.0,
+                        requiresSellForZeroTarget = false
+                    )
+                }
+            )
+        }
+
+        val totalWeight = (totalTargetPct / 100.0).coerceAtMost(1.0)
+        var targetTotal = currentTotal
+        var untargetedValue = 0.0
+
+        for (cat in AssetCategory.entries) {
+            val actualVal = actualByCat[cat]?.totalValueThb ?: 0.0
+            val weight = (cleanTargets[cat] ?: 0.0) / 100.0
+            if (weight > 0.0) {
+                targetTotal = maxOf(targetTotal, actualVal / weight)
+            } else {
+                untargetedValue += actualVal
+            }
+        }
+
+        val remainingWeight = (1.0 - totalWeight).coerceAtLeast(0.0)
+        val hasZeroTargetHoldings = untargetedValue > 0.01 && remainingWeight <= 1e-4
+        if (untargetedValue > 0.01 && remainingWeight > 1e-4) {
+            targetTotal = maxOf(targetTotal, untargetedValue / remainingWeight)
+        }
+
+        val byCategory = AssetCategory.entries.associateWith { cat ->
+            val actualVal = actualByCat[cat]?.totalValueThb ?: 0.0
+            val actualPct = actualByCat[cat]?.percentOfPortfolio ?: 0.0
+            val targetPct = cleanTargets[cat] ?: 0.0
+            val weight = targetPct / 100.0
+            val swapDelta = currentTotal * weight - actualVal
+            val requiresSellZero = targetPct <= 0.0 && actualVal > 0.01 && remainingWeight <= 1e-4
+            val freshCashAdd = if (weight > 0.0) {
+                (targetTotal * weight - actualVal).coerceAtLeast(0.0)
+            } else {
+                0.0
+            }
+            CategoryRebalancePlan(
+                category = cat,
+                actualValueThb = actualVal,
+                actualPercent = actualPct,
+                targetPercent = targetPct,
+                diffPercent = targetPct - actualPct,
+                freshCashAddThb = freshCashAdd,
+                swapDeltaThb = swapDelta,
+                requiresSellForZeroTarget = requiresSellZero
+            )
+        }
+
+        val totalFreshCash = (targetTotal - currentTotal).coerceAtLeast(0.0)
+        return PlanRebalanceSummary(
+            currentTotalThb = currentTotal,
+            targetTotalThb = targetTotal,
+            totalFreshCashNeededThb = totalFreshCash,
+            totalTargetPercent = totalTargetPct,
+            isValidForCalculation = true,
+            hasZeroTargetHoldings = hasZeroTargetHoldings,
+            byCategory = byCategory
+        )
+    }
+
     private data class Quad(
         val orig: Double,
         val thb: Double,
@@ -224,3 +332,24 @@ object PortfolioAnalyzer {
         val isFallback: Boolean
     )
 }
+
+data class CategoryRebalancePlan(
+    val category: AssetCategory,
+    val actualValueThb: Double,
+    val actualPercent: Double,
+    val targetPercent: Double,
+    val diffPercent: Double,
+    val freshCashAddThb: Double,
+    val swapDeltaThb: Double,
+    val requiresSellForZeroTarget: Boolean
+)
+
+data class PlanRebalanceSummary(
+    val currentTotalThb: Double,
+    val targetTotalThb: Double,
+    val totalFreshCashNeededThb: Double,
+    val totalTargetPercent: Double,
+    val isValidForCalculation: Boolean,
+    val hasZeroTargetHoldings: Boolean,
+    val byCategory: Map<AssetCategory, CategoryRebalancePlan>
+)

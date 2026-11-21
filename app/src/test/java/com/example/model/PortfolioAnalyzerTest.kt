@@ -337,4 +337,78 @@ class PortfolioAnalyzerTest {
         assertEquals(allScopes.size, allScopes.map { com.example.ui.theme.categoryAccentColor(it) }.distinct().size)
         assertEquals(allScopes.size, allScopes.map { com.example.ui.theme.categoryContainerColor(it) }.distinct().size)
     }
+
+    @Test
+    fun calculatePlanRebalance_freshCashAccountsForGrowingTotalPortfolio() {
+        val holdings = listOf(
+            Holding(
+                id = 1L,
+                symbol = "PTT",
+                displayName = "ปตท.",
+                category = AssetCategory.THAI_STOCK.name,
+                sector = StockSector.ENERGY.name,
+                quantity = 1000.0,
+                buyPricePerUnit = 100.0,
+                currency = "THB"
+            )
+        )
+        val summary = PortfolioAnalyzer.analyze(holdings, MarketSnapshot())
+        assertEquals(100_000.0, summary.totalValueThb, 0.01)
+
+        // 1) Missing 8% Gold on 100,000 portfolio (92% Thai Stock / 8% Gold):
+        // Adding 8,000 would only yield 8,000 / 108,000 = 7.41%.
+        // Exact fresh cash = 100,000 * (8 / 92) = 8,695.65 -> 8,695.65 / 108,695.65 = 8.00% exactly.
+        val twoAssetPlan = PortfolioAnalyzer.calculatePlanRebalance(
+            summary = summary,
+            targetPercents = mapOf(
+                AssetCategory.THAI_STOCK to 92.0,
+                AssetCategory.GOLD to 8.0
+            )
+        )
+        assertTrue(twoAssetPlan.isValidForCalculation)
+        val goldPlan = twoAssetPlan.byCategory[AssetCategory.GOLD]!!
+        val thaiPlan = twoAssetPlan.byCategory[AssetCategory.THAI_STOCK]!!
+        assertEquals(108_695.65, twoAssetPlan.targetTotalThb, 0.05)
+        assertEquals(8_695.65, goldPlan.freshCashAddThb, 0.05)
+        assertEquals(0.0, thaiPlan.freshCashAddThb, 0.01)
+        assertEquals(-8_000.0, thaiPlan.swapDeltaThb, 0.01)
+        val resultingGoldShare = goldPlan.freshCashAddThb / (summary.totalValueThb + goldPlan.freshCashAddThb) * 100.0
+        assertEquals(8.0, resultingGoldShare, 0.0001)
+
+        // 2) Multi-asset 100% plan: 77% Thai Stock, 15% Global Stock, 8% Gold
+        val multiPlan = PortfolioAnalyzer.calculatePlanRebalance(
+            summary = summary,
+            targetPercents = mapOf(
+                AssetCategory.THAI_STOCK to 77.0,
+                AssetCategory.GLOBAL_STOCK to 15.0,
+                AssetCategory.GOLD to 8.0
+            )
+        )
+        val expectedNewTotal = 100_000.0 / 0.77
+        assertEquals(expectedNewTotal, multiPlan.targetTotalThb, 0.05)
+        val addGlobal = multiPlan.byCategory[AssetCategory.GLOBAL_STOCK]!!.freshCashAddThb
+        val addGold = multiPlan.byCategory[AssetCategory.GOLD]!!.freshCashAddThb
+        val finalTotal = summary.totalValueThb + addGlobal + addGold
+        assertEquals(77.0, (100_000.0 / finalTotal) * 100.0, 0.0001)
+        assertEquals(15.0, (addGlobal / finalTotal) * 100.0, 0.0001)
+        assertEquals(8.0, (addGold / finalTotal) * 100.0, 0.0001)
+
+        // 3) Partial target plan (sum < 100%): only Gold = 8% specified
+        val partialPlan = PortfolioAnalyzer.calculatePlanRebalance(
+            summary = summary,
+            targetPercents = mapOf(AssetCategory.GOLD to 8.0)
+        )
+        assertTrue(partialPlan.isValidForCalculation)
+        assertEquals(8_695.65, partialPlan.byCategory[AssetCategory.GOLD]!!.freshCashAddThb, 0.05)
+
+        // 4) Invalid plan (sum > 100%)
+        val overPlan = PortfolioAnalyzer.calculatePlanRebalance(
+            summary = summary,
+            targetPercents = mapOf(
+                AssetCategory.THAI_STOCK to 70.0,
+                AssetCategory.GOLD to 40.0
+            )
+        )
+        assertTrue(!overPlan.isValidForCalculation)
+    }
 }

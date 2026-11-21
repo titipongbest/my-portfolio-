@@ -139,6 +139,14 @@ class PortfolioEmulatorTest {
             assertTextNotTruncated(
                 composeRule.onNode(hasText("เปลี่ยน") and inHeader, useUnmergedTree = true)
             )
+
+            if (category == AssetCategory.GOLD || category == AssetCategory.CRYPTO) {
+                composeRule.onNodeWithTag("nav_tab_ANALYTICS").assertDoesNotExist()
+                composeRule.onNodeWithTag("nav_tab_DASHBOARD").assertIsDisplayed()
+                composeRule.onNodeWithTag("nav_tab_HOLDINGS").assertIsDisplayed()
+            } else {
+                composeRule.onNodeWithTag("nav_tab_ANALYTICS").assertIsDisplayed()
+            }
         }
     }
 

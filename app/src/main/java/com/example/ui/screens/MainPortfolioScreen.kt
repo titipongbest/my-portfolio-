@@ -512,6 +512,17 @@ fun MainPortfolioScreen(
         }
     }
 
+    val visibleMainTabs = remember(uiState.selectedCategory) {
+        visibleMainTabsFor(uiState.selectedCategory)
+    }
+    val effectiveMainTab = if (selectedTab in visibleMainTabs) selectedTab else MainTab.DASHBOARD
+
+    LaunchedEffect(uiState.selectedCategory) {
+        if (selectedTab !in visibleMainTabsFor(uiState.selectedCategory)) {
+            selectedTab = MainTab.DASHBOARD
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val useRail = maxWidth >= 600.dp
@@ -542,7 +553,8 @@ fun MainPortfolioScreen(
                 if (!useRail) {
                     SlimBottomNavBar(
                         isOverviewSelected = uiState.isOverviewSelected,
-                        selectedMainTab = selectedTab,
+                        visibleMainTabs = visibleMainTabs,
+                        selectedMainTab = effectiveMainTab,
                         selectedOverviewTab = selectedOverviewTab,
                         onSelectMainTab = { selectedTab = it },
                         onSelectOverviewTab = { selectedOverviewTab = it }
@@ -590,9 +602,9 @@ fun MainPortfolioScreen(
                                     )
                                 }
                             } else {
-                                MainTab.entries.forEach { tab ->
+                                visibleMainTabs.forEach { tab ->
                                     NavigationRailItem(
-                                        selected = selectedTab == tab,
+                                        selected = effectiveMainTab == tab,
                                         onClick = { selectedTab = tab },
                                         icon = {
                                             Icon(
@@ -669,7 +681,7 @@ fun MainPortfolioScreen(
                                 }
                             }
                             else -> {
-                                when (selectedTab) {
+                                when (effectiveMainTab) {
                                     MainTab.DASHBOARD -> DashboardTab(
                                         uiState = uiState,
                                         onRefreshPrices = viewModel::refreshPrices,
@@ -1169,9 +1181,15 @@ private fun TopCategoryDropdownBar(
     }
 }
 
+private fun visibleMainTabsFor(category: AssetCategory): List<MainTab> = when (category) {
+    AssetCategory.GOLD, AssetCategory.CRYPTO -> listOf(MainTab.DASHBOARD, MainTab.HOLDINGS)
+    else -> MainTab.entries
+}
+
 @Composable
 private fun SlimBottomNavBar(
     isOverviewSelected: Boolean,
+    visibleMainTabs: List<MainTab>,
     selectedMainTab: MainTab,
     selectedOverviewTab: OverviewTabMenu,
     onSelectMainTab: (MainTab) -> Unit,
@@ -1209,7 +1227,7 @@ private fun SlimBottomNavBar(
                     )
                 }
             } else {
-                MainTab.entries.forEach { tab ->
+                visibleMainTabs.forEach { tab ->
                     SlimBottomNavItem(
                         label = tab.labelTh,
                         icon = tab.icon,

@@ -482,7 +482,10 @@ class PortfolioEmulatorTest {
         composeRule.onNodeWithTag("backup_screen_export_button").performScrollTo().assertIsDisplayed()
         composeRule.waitForIdle()
         performFingerTap(composeRule.onNodeWithTag("backup_screen_export_button"))
-        waitUntilCondition(5_000) { exportedWithPlanFile.exists() && exportedWithPlanFile.length() > 10 }
+        waitUntilCondition(5_000, failureDetails = {
+            val recorded = Intents.getIntents().joinToString(" | ") { "${it.action}:${it.type}" }
+            "Expected exportedWithPlanFile to be written. exists=${exportedWithPlanFile.exists()}, len=${exportedWithPlanFile.length()}, intents=[$recorded]"
+        }) { exportedWithPlanFile.exists() && exportedWithPlanFile.length() > 10 }
 
         val exportedJson = exportedWithPlanFile.readText(Charsets.UTF_8)
         val rootObj = org.json.JSONObject(exportedJson)

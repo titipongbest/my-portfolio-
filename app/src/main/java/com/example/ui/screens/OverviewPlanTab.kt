@@ -50,6 +50,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -76,6 +77,7 @@ fun OverviewPlanTab(
     modifier: Modifier = Modifier
 ) {
     val portfolioColors = LocalPortfolioColors.current
+    val focusManager = LocalFocusManager.current
     val fullSummary = uiState.fullPortfolioSummary
     val savedPlan = uiState.portfolioPlan
 
@@ -318,7 +320,10 @@ fun OverviewPlanTab(
                             }
 
                             Button(
-                                onClick = { onSavePlan(buildDraftPlan()) },
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    onSavePlan(buildDraftPlan())
+                                },
                                 shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.primary,
@@ -628,7 +633,10 @@ fun OverviewPlanTab(
                         }
 
                         Button(
-                            onClick = { onSavePlan(buildDraftPlan()) },
+                            onClick = {
+                                focusManager.clearFocus()
+                                onSavePlan(buildDraftPlan())
+                            },
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,

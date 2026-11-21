@@ -588,7 +588,10 @@ fun MainPortfolioScreen(
                             )
                         }
                         IconButton(
-                            onClick = { showBackupScreen = true },
+                            onClick = {
+                                viewModel.clearActionMessage()
+                                showBackupScreen = true
+                            },
                             modifier = Modifier.testTag("backup_screen_button")
                         ) {
                             Icon(

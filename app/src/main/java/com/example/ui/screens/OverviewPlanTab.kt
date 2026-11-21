@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -795,18 +796,11 @@ fun OverviewPlanTab(
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    text = "โน้ตแผนการลงทุนโดยรวม (Note)",
-                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "บันทึกกติกา DCA เป้าหมายผลตอบแทน หรือเงื่อนไขรีบาลานซ์",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = portfolioColors.mutedSlate
-                                )
-                            }
+                            Text(
+                                text = "โน้ต (Note)",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                         }
 
                         if (isEditingPlan) {
@@ -817,7 +811,7 @@ fun OverviewPlanTab(
                                 },
                                 placeholder = {
                                     Text(
-                                        text = "เช่น เติมเงิน DCA ทุกวันที่ 25 ของเดือน, รีบาลานซ์ทุกไตรมาสเมื่อสัดส่วนคลาดเคลื่อนเกิน 5%",
+                                        text = "พิมพ์โน้ต...",
                                         style = MaterialTheme.typography.bodySmall
                                     )
                                 },
@@ -830,27 +824,39 @@ fun OverviewPlanTab(
                                     .fillMaxWidth()
                                     .testTag("plan_overall_note_input")
                             )
-                        } else if (savedPlan.overallNote.isNotBlank()) {
+                        } else {
+                            val hasOverallNote = savedPlan.overallNote.isNotBlank()
                             Surface(
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth()
+                                border = BorderStroke(
+                                    width = 1.dp,
+                                    color = if (hasOverallNote) {
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                                    } else {
+                                        MaterialTheme.colorScheme.outline
+                                    }
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 72.dp)
                             ) {
                                 Text(
-                                    text = savedPlan.overallNote,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                                    text = if (hasOverallNote) savedPlan.overallNote else "ว่าง",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        lineHeight = 22.sp
+                                    ),
+                                    color = if (hasOverallNote) {
+                                        MaterialTheme.colorScheme.onSurface
+                                    } else {
+                                        portfolioColors.mutedSlate
+                                    },
                                     modifier = Modifier
-                                        .padding(12.dp)
+                                        .fillMaxWidth()
+                                        .padding(14.dp)
                                         .testTag("plan_overall_note_text")
                                 )
                             }
-                        } else {
-                            Text(
-                                text = "ยังไม่ได้บันทึกโน้ตเพิ่มเติม กดปุ่ม \"แก้ไขแผน\" ด้านบนเพื่อเพิ่มโน้ต",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = portfolioColors.mutedSlate
-                            )
                         }
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline)

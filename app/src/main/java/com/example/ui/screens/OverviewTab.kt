@@ -523,16 +523,26 @@ private fun OverviewHeroSection(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "${FormatUtils.formatUpdatedTime(lastUpdatedMillis)} • 1 USD = ฿${String.format(Locale.US, "%.2f", usdToThbRate)}${if (isLiveFxRate) "" else "*"}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.82f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                Column(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(end = 8.dp)
-                )
+                        .padding(end = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(1.dp)
+                ) {
+                    Text(
+                        text = "1 USD = ฿${String.format(Locale.US, "%.2f", usdToThbRate)}${if (isLiveFxRate) "" else "*"}",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = Color.White.copy(alpha = 0.94f),
+                        softWrap = false
+                    )
+                    Text(
+                        text = FormatUtils.formatUpdatedTime(lastUpdatedMillis),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.76f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
                 Surface(
                     color = Color.White.copy(alpha = 0.16f),
